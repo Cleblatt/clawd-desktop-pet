@@ -45,7 +45,7 @@ static class Program
             PetWindow.DemoAtStart = Array.IndexOf(args, "--demo") >= 0;
             Application app = new Application();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            if (Cfg.FirstRun) new SetupWindow().ShowDialog();
+            if (Cfg.FirstRun || Array.IndexOf(args, "--setup") >= 0) new SetupWindow().ShowDialog();
             PetWindow pet = new PetWindow();
             app.MainWindow = pet;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;

@@ -74,6 +74,8 @@ Want to record a video? Right-click Clawd → **Demo mode** (or start with `Claw
 
 To type along, the app asks Windows *whether* a key is currently pressed (`GetAsyncKeyState`). It never looks at *which* key, and nothing is stored or sent anywhere – the app does not use the network at all. Some antivirus tools flag this kind of check anyway.
 
+The right-click menu has a frosted-glass look. For that, the app takes a snapshot of the small screen area behind the menu at the moment it opens and blurs it. The snapshot only lives in memory while the menu is open.
+
 Settings live in `%AppData%\ClawdPet\settings.txt`.
 
 ## Good to know

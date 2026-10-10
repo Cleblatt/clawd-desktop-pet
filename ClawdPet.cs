@@ -10,9 +10,12 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -34,6 +37,15 @@ static class Program
         {
             Cfg.Lang = args[2] == "de" ? "de" : "en";
             SetupWindow.RenderShot(args[1]);
+            return;
+        }
+
+        if (args.Length == 2 && args[0] == "--menu-shot")
+        {
+            Cfg.Load();
+            Cfg.ReadOnly = true;
+            PetWindow.ShotPath = args[1];
+            new Application().Run(new PetWindow());
             return;
         }
 
@@ -149,6 +161,7 @@ class SetupWindow : Window
     readonly CheckBox talk = new CheckBox(), auto = new CheckBox();
     readonly StackPanel root = new StackPanel();
     string color = Cfg.Color;
+    static bool noAnim;
 
     static string T(string de, string en) { return Cfg.T(de, en); }
 
@@ -227,7 +240,11 @@ class SetupWindow : Window
             b.BorderThickness = new Thickness(3);
             b.Cursor = Cursors.Hand;
             b.Tag = val;
-            b.MouseLeftButtonDown += delegate { color = val; Mark(); };
+            b.RenderTransformOrigin = new Point(0.5, 0.5);
+            b.RenderTransform = new ScaleTransform(1, 1);
+            b.MouseEnter += delegate { Zoom(b, 1.14, 0.2); };
+            b.MouseLeave += delegate { Zoom(b, 1, 0.25); };
+            b.MouseLeftButtonDown += delegate { color = val; Mark(); Pop(b); Pop(logo); };
             swatches.Children.Add(b);
         }
         root.Children.Add(swatches);
@@ -250,8 +267,11 @@ class SetupWindow : Window
         okText.FontSize = 15;
         okText.HorizontalAlignment = HorizontalAlignment.Center;
         ok.Child = okText;
-        ok.MouseEnter += delegate { ok.Opacity = 0.88; };
-        ok.MouseLeave += delegate { ok.Opacity = 1; };
+        ok.RenderTransformOrigin = new Point(0.5, 0.5);
+        ok.RenderTransform = new ScaleTransform(1, 1);
+        ok.MouseEnter += delegate { Zoom(ok, 1.03, 0.2); };
+        ok.MouseLeave += delegate { Zoom(ok, 1, 0.25); };
+        ok.MouseLeftButtonDown += delegate { Zoom(ok, 0.96, 0.08); };
         ok.MouseLeftButtonUp += delegate { Close(); };
         root.Children.Add(ok);
 
@@ -262,9 +282,13 @@ class SetupWindow : Window
         hint.Margin = new Thickness(0, 10, 0, 0);
         root.Children.Add(hint);
 
+        logo.RenderTransformOrigin = new Point(0.5, 1);
+        logo.RenderTransform = new ScaleTransform(1, 1);
+
         Content = root;
         Retext();
         Mark();
+        if (!noAnim) Entrance();
 
         KeyDown += delegate(object s, KeyEventArgs e) { if (e.Key == Key.Enter || e.Key == Key.Escape) Close(); };
         Closed += delegate
@@ -292,6 +316,42 @@ class SetupWindow : Window
         auto.Content = T("Mit Windows starten", "Start with Windows");
         okText.Text = T("Los geht's!", "Let's go!");
         hint.Text = T("Alles lässt sich später per Rechtsklick auf Clawd ändern.", "You can change everything later by right-clicking Clawd.");
+    }
+
+    // Everything slides up and fades in, one row after the other.
+    void Entrance()
+    {
+        for (int i = 0; i < root.Children.Count; i++)
+        {
+            UIElement el = root.Children[i];
+            if (el == logo) continue;
+            TranslateTransform tr = new TranslateTransform(0, 16);
+            el.RenderTransform = tr;
+            el.Opacity = 0;
+            TimeSpan delay = TimeSpan.FromSeconds(0.12 + i * 0.045);
+            DoubleAnimation fade = Glass.Anim(0, 1, 0.3, Glass.Smooth);
+            DoubleAnimation move = Glass.Anim(16, 0, 0.45, Glass.Smooth);
+            fade.BeginTime = move.BeginTime = delay;
+            el.BeginAnimation(OpacityProperty, fade);
+            tr.BeginAnimation(TranslateTransform.YProperty, move);
+        }
+        Loaded += delegate { Pop(logo); };
+    }
+
+    static void Zoom(FrameworkElement el, double to, double secs)
+    {
+        ScaleTransform sc = (ScaleTransform)el.RenderTransform;
+        sc.BeginAnimation(ScaleTransform.ScaleXProperty, Glass.Anim(null, to, secs, Glass.Spring));
+        sc.BeginAnimation(ScaleTransform.ScaleYProperty, Glass.Anim(null, to, secs, Glass.Spring));
+    }
+
+    // A quick squash-and-bounce.
+    static void Pop(FrameworkElement el)
+    {
+        ScaleTransform sc = (ScaleTransform)el.RenderTransform;
+        double rest = el.IsMouseOver && el is Border ? 1.14 : 1;
+        sc.BeginAnimation(ScaleTransform.ScaleXProperty, Glass.Anim(0.8, rest, 0.4, Glass.Spring));
+        sc.BeginAnimation(ScaleTransform.ScaleYProperty, Glass.Anim(0.8, rest, 0.4, Glass.Spring));
     }
 
     // Highlight the chosen swatch and redraw the little Clawd in that colour.
@@ -325,6 +385,7 @@ class SetupWindow : Window
     public static void RenderShot(string path)
     {
         Cfg.ReadOnly = true;
+        noAnim = true;
         SetupWindow w = new SetupWindow();
         w.ContentRendered += delegate
         {
@@ -343,6 +404,359 @@ class SetupWindow : Window
             w.Close();
         };
         new Application().Run(w);
+    }
+}
+
+// Frosted-glass look and animations for the right-click menu.
+// The "glass" is a blurred snapshot of the screen area behind the menu, taken when it opens.
+static class Glass
+{
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
+
+    const double Pad = 40, Radius = 14;
+    static bool hooked;
+
+    const string Xaml = @"
+<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+  <SolidColorBrush x:Key='Fg' Color='$FG$'/>
+
+  <Style x:Key='GlassHost' TargetType='ContentControl'>
+    <Setter Property='Opacity' Value='0'/>
+    <Setter Property='Focusable' Value='False'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='ContentControl'>
+          <Grid Margin='18'>
+            <Border CornerRadius='14' Background='#FF707070' Margin='1'>
+              <Border.Effect><DropShadowEffect BlurRadius='24' ShadowDepth='7' Direction='270' Opacity='0.38' Color='Black'/></Border.Effect>
+            </Border>
+            <Canvas x:Name='Clip'>
+              <Image x:Name='Back' Stretch='Fill'>
+                <Image.Effect><BlurEffect Radius='30' KernelType='Gaussian' RenderingBias='Performance'/></Image.Effect>
+              </Image>
+            </Canvas>
+            <Border CornerRadius='14' Background='$TINT$'/>
+            <Border CornerRadius='14'>
+              <Border.Background>
+                <LinearGradientBrush StartPoint='0,0' EndPoint='0,1'>
+                  <GradientStop Color='#40FFFFFF' Offset='0'/>
+                  <GradientStop Color='#00FFFFFF' Offset='0.4'/>
+                </LinearGradientBrush>
+              </Border.Background>
+            </Border>
+            <Canvas x:Name='HiCanvas' Margin='6'>
+              <Border x:Name='Hi' Canvas.Left='0' Canvas.Top='0' Width='10' Height='30' CornerRadius='9' Opacity='0' IsHitTestVisible='False'>
+                <Border.Background>
+                  <LinearGradientBrush StartPoint='0,0' EndPoint='0,1'>
+                    <GradientStop Color='#F2FF7E3D' Offset='0'/>
+                    <GradientStop Color='#F2EE5A17' Offset='1'/>
+                  </LinearGradientBrush>
+                </Border.Background>
+              </Border>
+            </Canvas>
+            <ContentPresenter Margin='6'/>
+            <Border CornerRadius='14' BorderThickness='1' IsHitTestVisible='False'>
+              <Border.BorderBrush>
+                <LinearGradientBrush StartPoint='0,0' EndPoint='1,1'>
+                  <GradientStop Color='$RIM1$' Offset='0'/>
+                  <GradientStop Color='$RIM2$' Offset='0.5'/>
+                  <GradientStop Color='$RIM3$' Offset='1'/>
+                </LinearGradientBrush>
+              </Border.BorderBrush>
+            </Border>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key='GlassMenu' TargetType='ContextMenu'>
+    <Setter Property='HasDropShadow' Value='False'/>
+    <Setter Property='Background' Value='Transparent'/>
+    <Setter Property='Foreground' Value='{StaticResource Fg}'/>
+    <Setter Property='FontFamily' Value='Segoe UI Variable Text, Segoe UI'/>
+    <Setter Property='FontSize' Value='13'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='ContextMenu'>
+          <ContentControl x:Name='Host' Style='{StaticResource GlassHost}' Tag='glass' MinWidth='236'>
+            <ItemsPresenter KeyboardNavigation.DirectionalNavigation='Cycle'/>
+          </ContentControl>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType='MenuItem'>
+    <Setter Property='OverridesDefaultStyle' Value='True'/>
+    <Setter Property='FocusVisualStyle' Value='{x:Null}'/>
+    <Setter Property='Foreground' Value='{StaticResource Fg}'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='MenuItem'>
+          <Grid Background='Transparent' Height='30'>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width='30'/>
+              <ColumnDefinition Width='*'/>
+              <ColumnDefinition Width='30'/>
+            </Grid.ColumnDefinitions>
+            <Path x:Name='Check' Data='M0,4 L3.5,7.5 L10,0.5' Stroke='{TemplateBinding Foreground}' StrokeThickness='1.8'
+                  StrokeStartLineCap='Round' StrokeEndLineCap='Round' StrokeLineJoin='Round'
+                  HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
+            <ContentPresenter x:Name='Text' Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' RecognizesAccessKey='True'>
+              <ContentPresenter.RenderTransform><TranslateTransform/></ContentPresenter.RenderTransform>
+            </ContentPresenter>
+            <Path x:Name='Arrow' Grid.Column='2' Data='M0,0 L4,4 L0,8' Stroke='{TemplateBinding Foreground}' StrokeThickness='1.6' Opacity='0.6'
+                  StrokeStartLineCap='Round' StrokeEndLineCap='Round' StrokeLineJoin='Round'
+                  HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
+            <Popup x:Name='PART_Popup' Placement='Right' HorizontalOffset='-8' VerticalOffset='-24' AllowsTransparency='True'
+                   Focusable='False' PopupAnimation='None' IsOpen='{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}'>
+              <ContentControl x:Name='SubHost' Style='{StaticResource GlassHost}' Tag='glass' MinWidth='200'>
+                <ItemsPresenter KeyboardNavigation.DirectionalNavigation='Cycle'/>
+              </ContentControl>
+            </Popup>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property='IsChecked' Value='True'>
+              <Setter TargetName='Check' Property='Visibility' Value='Visible'/>
+            </Trigger>
+            <Trigger Property='HasItems' Value='True'>
+              <Setter TargetName='Arrow' Property='Visibility' Value='Visible'/>
+            </Trigger>
+            <Trigger Property='IsHighlighted' Value='True'>
+              <Setter Property='Foreground' Value='White'/>
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName='Text' Storyboard.TargetProperty='(UIElement.RenderTransform).(TranslateTransform.X)' To='3' Duration='0:0:0.16'>
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode='EaseOut'/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName='Text' Storyboard.TargetProperty='(UIElement.RenderTransform).(TranslateTransform.X)' To='0' Duration='0:0:0.22'>
+                      <DoubleAnimation.EasingFunction><CubicEase EasingMode='EaseOut'/></DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key='{x:Static MenuItem.SeparatorStyleKey}' TargetType='Separator'>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='Separator'>
+          <Border Height='1' Margin='10,5' Background='$SEP$'/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>";
+
+    // Follows the Windows light / dark app setting.
+    static bool Dark
+    {
+        get
+        {
+            try
+            {
+                object v = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1);
+                return v is int && (int)v == 0;
+            }
+            catch { return false; }
+        }
+    }
+
+    public static readonly IEasingFunction Smooth = new CubicEase(), Spring = MakeSpring();
+
+    static IEasingFunction MakeSpring()
+    {
+        BackEase b = new BackEase();
+        b.Amplitude = 0.6;
+        b.EasingMode = EasingMode.EaseOut;
+        return b;
+    }
+
+    public static DoubleAnimation Anim(double? from, double to, double secs, IEasingFunction ease)
+    {
+        DoubleAnimation a = new DoubleAnimation();
+        if (from.HasValue) a.From = from.Value;
+        a.To = to;
+        a.Duration = TimeSpan.FromSeconds(secs);
+        a.EasingFunction = ease;
+        return a;
+    }
+
+    public static void Apply(ContextMenu menu)
+    {
+        if (!hooked)
+        {
+            hooked = true;
+            EventManager.RegisterClassHandler(typeof(MenuItem), MenuItem.SubmenuOpenedEvent, new RoutedEventHandler(OnSubOpened));
+            EventManager.RegisterClassHandler(typeof(MenuItem), MenuItem.SubmenuClosedEvent, new RoutedEventHandler(OnSubClosed));
+            EventManager.RegisterClassHandler(typeof(MenuItem), UIElement.MouseEnterEvent, new MouseEventHandler(OnEnter));
+            EventManager.RegisterClassHandler(typeof(MenuItem), UIElement.MouseLeaveEvent, new MouseEventHandler(OnLeave));
+        }
+        bool dark = Dark;
+        string x = Xaml
+            .Replace("$FG$", dark ? "#FFFFFFFF" : "#FF1A1915")
+            .Replace("$TINT$", dark ? "#A61E1E22" : "#A6FFFFFF")
+            .Replace("$SEP$", dark ? "#33FFFFFF" : "#26000000")
+            .Replace("$RIM1$", dark ? "#80FFFFFF" : "#F0FFFFFF")
+            .Replace("$RIM2$", dark ? "#1AFFFFFF" : "#50FFFFFF")
+            .Replace("$RIM3$", dark ? "#40FFFFFF" : "#A0FFFFFF");
+        ResourceDictionary d = (ResourceDictionary)XamlReader.Parse(x);
+        menu.Resources.MergedDictionaries.Add(d);
+        menu.Style = (Style)d["GlassMenu"];
+        menu.Opened += delegate
+        {
+            // the system's own menu fade/slide would fight with ours
+            Popup pop = menu.Parent as Popup;
+            if (pop != null) pop.PopupAnimation = PopupAnimation.None;
+            Open(menu.Template.FindName("Host", menu) as ContentControl, false);
+        };
+        menu.Closed += delegate { Reset(menu.Template.FindName("Host", menu) as ContentControl); };
+    }
+
+    static void Reset(ContentControl host)
+    {
+        if (host == null) return;
+        host.BeginAnimation(UIElement.OpacityProperty, null);
+        host.Opacity = 0;
+    }
+
+    static T Part<T>(ContentControl host, string name) where T : class
+    {
+        return host.Template == null ? null : host.Template.FindName(name, host) as T;
+    }
+
+    static void Open(ContentControl host, bool sub)
+    {
+        if (host == null) return;
+        Reset(host);
+        host.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(delegate
+        {
+            host.ApplyTemplate();
+            Border hi = Part<Border>(host, "Hi");
+            if (hi != null) { hi.BeginAnimation(UIElement.OpacityProperty, null); hi.Opacity = 0; }
+            host.RenderTransform = Transform.Identity;
+            try { Snapshot(Part<Canvas>(host, "Clip"), Part<Image>(host, "Back")); } catch { }
+
+            // pop in: fade, grow from the edge it hangs on, with a little overshoot
+            ScaleTransform sc = new ScaleTransform(1, 1);
+            TranslateTransform tr = new TranslateTransform();
+            TransformGroup g = new TransformGroup();
+            g.Children.Add(sc);
+            g.Children.Add(tr);
+            host.RenderTransformOrigin = sub ? new Point(0, 0.15) : new Point(0.5, 0);
+            host.RenderTransform = g;
+            host.BeginAnimation(UIElement.OpacityProperty, Anim(0, 1, 0.14, Smooth));
+            sc.BeginAnimation(ScaleTransform.ScaleXProperty, Anim(0.9, 1, 0.3, Spring));
+            sc.BeginAnimation(ScaleTransform.ScaleYProperty, Anim(0.9, 1, 0.3, Spring));
+            tr.BeginAnimation(sub ? TranslateTransform.XProperty : TranslateTransform.YProperty, Anim(-8, 0, 0.26, Smooth));
+        }));
+    }
+
+    // Copies the screen behind the menu into the blurred backdrop image.
+    static void Snapshot(Canvas clip, Image img)
+    {
+        if (clip == null || img == null || clip.ActualWidth < 1) return;
+        PresentationSource src = PresentationSource.FromVisual(clip);
+        if (src == null || src.CompositionTarget == null) return;
+        double dpi = src.CompositionTarget.TransformToDevice.M11;
+        Point o = clip.PointToScreen(new Point(-Pad, -Pad));
+        double w = clip.ActualWidth + 2 * Pad, h = clip.ActualHeight + 2 * Pad;
+        int pw = (int)Math.Ceiling(w * dpi), ph = (int)Math.Ceiling(h * dpi);
+        using (SD.Bitmap bmp = new SD.Bitmap(pw, ph, SD.Imaging.PixelFormat.Format32bppArgb))
+        {
+            using (SD.Graphics g = SD.Graphics.FromImage(bmp))
+                g.CopyFromScreen((int)Math.Round(o.X), (int)Math.Round(o.Y), 0, 0, new SD.Size(pw, ph));
+            IntPtr hb = bmp.GetHbitmap();
+            try
+            {
+                BitmapSource bs = Imaging.CreateBitmapSourceFromHBitmap(hb, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                bs.Freeze();
+                img.Source = bs;
+            }
+            finally { DeleteObject(hb); }
+        }
+        img.Width = w;
+        img.Height = h;
+        Canvas.SetLeft(img, -Pad);
+        Canvas.SetTop(img, -Pad);
+        clip.Clip = new RectangleGeometry(new Rect(0, 0, clip.ActualWidth, clip.ActualHeight), Radius, Radius);
+    }
+
+    static ContentControl HostOf(DependencyObject d)
+    {
+        while (d != null)
+        {
+            ContentControl c = d as ContentControl;
+            if (c != null && "glass".Equals(c.Tag)) return c;
+            d = VisualTreeHelper.GetParent(d);
+        }
+        return null;
+    }
+
+    static void OnSubOpened(object s, RoutedEventArgs e)
+    {
+        MenuItem mi = (MenuItem)s;
+        if (e.OriginalSource != mi || mi.Template == null) return;
+        Open(mi.Template.FindName("SubHost", mi) as ContentControl, true);
+    }
+
+    static void OnSubClosed(object s, RoutedEventArgs e)
+    {
+        MenuItem mi = (MenuItem)s;
+        if (e.OriginalSource != mi || mi.Template == null) return;
+        Reset(mi.Template.FindName("SubHost", mi) as ContentControl);
+        if (!mi.IsMouseOver) FadeHi(mi);
+    }
+
+    // The highlight is one pill per menu that glides to the hovered row.
+    static void OnEnter(object s, MouseEventArgs e)
+    {
+        MenuItem mi = (MenuItem)s;
+        ContentControl host = HostOf(mi);
+        if (host == null) return;
+        Border hi = Part<Border>(host, "Hi");
+        Canvas cv = Part<Canvas>(host, "HiCanvas");
+        if (hi == null || cv == null) return;
+        Point p = mi.TransformToVisual(cv).Transform(new Point(0, 0));
+        hi.Width = mi.ActualWidth;
+        hi.Height = mi.ActualHeight;
+        Canvas.SetLeft(hi, p.X);
+        if (hi.Opacity < 0.05)
+        {
+            hi.BeginAnimation(Canvas.TopProperty, null);
+            Canvas.SetTop(hi, p.Y);
+        }
+        else hi.BeginAnimation(Canvas.TopProperty, Anim(null, p.Y, 0.2, Spring));
+        hi.BeginAnimation(UIElement.OpacityProperty, Anim(null, 1, 0.1, Smooth));
+    }
+
+    static void OnLeave(object s, MouseEventArgs e)
+    {
+        MenuItem mi = (MenuItem)s;
+        if (!mi.IsSubmenuOpen) FadeHi(mi);
+    }
+
+    static void FadeHi(MenuItem mi)
+    {
+        ContentControl host = HostOf(mi);
+        Border hi = host == null ? null : Part<Border>(host, "Hi");
+        if (hi == null) return;
+        DoubleAnimation a = Anim(null, 0, 0.2, Smooth);
+        a.BeginTime = TimeSpan.FromSeconds(0.06);
+        hi.BeginAnimation(UIElement.OpacityProperty, a);
     }
 }
 
@@ -447,6 +861,7 @@ class PetWindow : Window
 
     // Demo mode: plays every activity in a fixed order (for screen recordings)
     public static bool DemoAtStart;
+    public static string ShotPath; // developer helper: screenshot of the open menu
     static readonly string[] DemoScript = { "wave", "walk", "code", "coffee", "read", "dance", "jump", "flip", "cool", "juggle", "pet", "eat", "stretch", "sleep", "chase", "climb", "balloon" };
     bool demo = DemoAtStart;
     int demoIdx;
@@ -513,6 +928,7 @@ class PetWindow : Window
         timer.Tick += Tick;
         last = DateTime.UtcNow;
         timer.Start();
+        if (ShotPath != null) MenuShot();
     }
 
     void ApplyScale()
@@ -533,6 +949,42 @@ class PetWindow : Window
     // ---------- Menus ----------
 
     static string T(string de, string en) { return Cfg.T(de, en); }
+
+    // Developer helper: opens the menu and a submenu by itself and saves a screenshot of that area.
+    void MenuShot()
+    {
+        int step = 0;
+        DispatcherTimer dt = new DispatcherTimer();
+        dt.Interval = TimeSpan.FromSeconds(2.5);
+        dt.Tick += delegate
+        {
+            step++;
+            dt.Interval = TimeSpan.FromSeconds(1.2);
+            if (step == 1)
+            {
+                menu.PlacementTarget = view;
+                menu.Placement = PlacementMode.Top;
+                menu.IsOpen = true;
+            }
+            else if (step == 2)
+            {
+                MenuItem acts = (MenuItem)menu.Items[4];
+                acts.IsSubmenuOpen = true;
+            }
+            else if (step == 3)
+            {
+                int w = 760, h = 640;
+                using (SD.Bitmap bmp = new SD.Bitmap(w, h))
+                {
+                    using (SD.Graphics g = SD.Graphics.FromImage(bmp))
+                        g.CopyFromScreen((int)((x - 330) * dpi), (int)((work.Bottom - h / dpi) * dpi), 0, 0, new SD.Size(w, h));
+                    bmp.Save(ShotPath, SD.Imaging.ImageFormat.Png);
+                }
+                Close();
+            }
+        };
+        dt.Start();
+    }
 
     MenuItem MI(string header, Action a)
     {
@@ -566,6 +1018,7 @@ class PetWindow : Window
     void BuildMenu()
     {
         menu = new ContextMenu();
+        Glass.Apply(menu);
         menu.Items.Add(MI(T("Streicheln", "Pet"), PetIt));
         menu.Items.Add(MI(T("Füttern", "Feed"), delegate { Do("eat"); }));
         menu.Items.Add(MI(T("Komm her!", "Come here!"), delegate { Do("chase"); }));

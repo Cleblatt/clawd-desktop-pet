@@ -74,6 +74,8 @@ Du willst ein Video aufnehmen? Rechtsklick auf Clawd → **Demo-Modus** (oder St
 
 Zum Mittippen fragt die App Windows, *ob* gerade eine Taste gedrückt ist (`GetAsyncKeyState`). *Welche* Taste es ist, wird nie ausgewertet, und nichts wird gespeichert oder gesendet – die App nutzt das Netzwerk überhaupt nicht. Manche Virenscanner stufen so eine Abfrage trotzdem als verdächtig ein.
 
+Das Rechtsklick-Menü hat einen Milchglas-Look. Dafür nimmt die App beim Öffnen ein Bild des kleinen Bildschirmbereichs hinter dem Menü auf und zeichnet es weich. Das Bild liegt nur im Arbeitsspeicher, solange das Menü offen ist.
+
 Die Einstellungen liegen in `%AppData%\ClawdPet\settings.txt`.
 
 ## Gut zu wissen

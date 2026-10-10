@@ -33,10 +33,10 @@ static class Program
             PetWindow.RenderSheet(args[1]);
             return;
         }
-        if (args.Length == 3 && args[0] == "--setup-shot")
+        if (args.Length >= 3 && args[0] == "--setup-shot")
         {
             Cfg.Lang = args[2] == "de" ? "de" : "en";
-            SetupWindow.RenderShot(args[1]);
+            SetupWindow.RenderShot(args[1], args.Length > 3);
             return;
         }
 
@@ -150,52 +150,60 @@ static class Cfg
 // First-run / settings dialog: language, size, colour and a few switches.
 class SetupWindow : Window
 {
-    static readonly Brush Ink = PetWindow.B("#1A1915"), Paper = PetWindow.B("#FAF9F5"), Muted = PetWindow.B("#6E6D68");
+    [StructLayout(LayoutKind.Sequential)]
+    struct MARGINS { public int L, R, T, B; }
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int val, int size);
+    [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
 
+    internal static readonly Brush Accent = PetWindow.B(Cfg.Orange);
+    static bool noAnim, forceLight;
+
+    readonly bool dark;
+    readonly Brush fg, muted;
     readonly Canvas logo = new Canvas();
     readonly TextBlock head = new TextBlock(), sub = new TextBlock(), hint = new TextBlock(), okText = new TextBlock();
-    readonly TextBlock lLang = Label(), lSize = Label(), lColor = Label();
-    readonly RadioButton de = new RadioButton(), en = new RadioButton();
-    readonly ComboBox size = new ComboBox();
+    readonly TextBlock lLang = new TextBlock(), lSize = new TextBlock(), lColor = new TextBlock();
+    readonly Segments lang, size;
+    readonly Toggle talk, auto;
     readonly StackPanel swatches = new StackPanel();
-    readonly CheckBox talk = new CheckBox(), auto = new CheckBox();
     readonly StackPanel root = new StackPanel();
     string color = Cfg.Color;
-    static bool noAnim;
 
     static string T(string de, string en) { return Cfg.T(de, en); }
 
-    static TextBlock Label()
-    {
-        TextBlock t = new TextBlock();
-        t.FontWeight = FontWeights.SemiBold;
-        t.Margin = new Thickness(0, 18, 0, 6);
-        return t;
-    }
-
     public SetupWindow()
     {
+        dark = Glass.Dark && !forceLight;
+        fg = dark ? Brushes.White : PetWindow.B("#1A1915");
+        muted = PetWindow.B(dark ? "#B4FFFFFF" : "#6E6D68");
+        Brush track = PetWindow.B(dark ? "#24FFFFFF" : "#16000000");
+        Brush switchOff = PetWindow.B(dark ? "#40FFFFFF" : "#38000000");
+
         Title = "Clawd";
         Width = 400;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;
+        Topmost = true;
+        Background = PetWindow.B(dark ? "#202023" : "#FAF9F5"); // swapped for glass in MakeGlass when Windows supports it
+        Foreground = fg;
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
+        FontSize = 14;
+        UseLayoutRounding = true;
+
         // Always centre on the primary monitor (CenterScreen would follow the mouse)
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - 400) / 2;
         Top = SystemParameters.WorkArea.Top + 80;
         Loaded += delegate { Top = SystemParameters.WorkArea.Top + Math.Max(0, (SystemParameters.WorkArea.Height - ActualHeight) / 2); };
-        Topmost = true;
-        Background = Paper;
-        Foreground = Ink;
-        FontFamily = new FontFamily("Segoe UI");
-        FontSize = 14;
-        UseLayoutRounding = true;
+        SourceInitialized += delegate { MakeGlass(); };
 
-        root.Margin = new Thickness(30, 26, 30, 26);
+        root.Margin = new Thickness(30, 22, 30, 26);
 
         logo.Width = 18 * 6;
         logo.Height = 10 * 6;
         logo.HorizontalAlignment = HorizontalAlignment.Center;
+        logo.RenderTransformOrigin = new Point(0.5, 1);
+        logo.RenderTransform = new ScaleTransform(1, 1);
         root.Children.Add(logo);
 
         head.FontSize = 24;
@@ -204,27 +212,26 @@ class SetupWindow : Window
         head.Margin = new Thickness(0, 14, 0, 0);
         root.Children.Add(head);
 
-        sub.Foreground = Muted;
+        sub.Foreground = muted;
         sub.TextWrapping = TextWrapping.Wrap;
         sub.TextAlignment = TextAlignment.Center;
         sub.Margin = new Thickness(0, 4, 0, 0);
         root.Children.Add(sub);
 
+        foreach (TextBlock l in new TextBlock[] { lLang, lSize, lColor })
+        {
+            l.FontWeight = FontWeights.SemiBold;
+            l.Margin = new Thickness(0, 18, 0, 7);
+        }
+
         root.Children.Add(lLang);
-        StackPanel langRow = new StackPanel();
-        langRow.Orientation = Orientation.Horizontal;
-        de.Content = "Deutsch";
-        en.Content = "English";
-        en.Margin = new Thickness(24, 0, 0, 0);
-        de.IsChecked = Cfg.Lang == "de";
-        en.IsChecked = Cfg.Lang != "de";
-        de.Checked += delegate { Cfg.Lang = "de"; Retext(); };
-        en.Checked += delegate { Cfg.Lang = "en"; Retext(); };
-        langRow.Children.Add(de);
-        langRow.Children.Add(en);
-        root.Children.Add(langRow);
+        lang = new Segments(2, Cfg.Lang == "de" ? 0 : 1, track, fg);
+        lang.SetLabels(new string[] { "Deutsch", "English" });
+        lang.Picked = delegate(int i) { Cfg.Lang = i == 0 ? "de" : "en"; Retext(); };
+        root.Children.Add(lang);
 
         root.Children.Add(lSize);
+        size = new Segments(Cfg.SizeVals.Length, Math.Max(0, Array.IndexOf(Cfg.SizeVals, Cfg.Size)), track, fg);
         root.Children.Add(size);
 
         root.Children.Add(lColor);
@@ -234,7 +241,7 @@ class SetupWindow : Window
             string val = v;
             Border b = new Border();
             b.Width = b.Height = 34;
-            b.CornerRadius = new CornerRadius(8);
+            b.CornerRadius = new CornerRadius(10);
             b.Margin = new Thickness(0, 0, 8, 0);
             b.Background = PetWindow.B(val);
             b.BorderThickness = new Thickness(3);
@@ -249,16 +256,18 @@ class SetupWindow : Window
         }
         root.Children.Add(swatches);
 
-        talk.IsChecked = Cfg.Talk;
-        talk.Margin = new Thickness(0, 20, 0, 0);
+        talk = new Toggle(Cfg.Talk, switchOff, fg);
+        talk.Margin = new Thickness(0, 22, 0, 0);
         root.Children.Add(talk);
-        try { auto.IsChecked = Cfg.AutoStart; } catch { }
-        auto.Margin = new Thickness(0, 8, 0, 0);
+        bool autoOn = false;
+        try { autoOn = Cfg.AutoStart; } catch { }
+        auto = new Toggle(autoOn, switchOff, fg);
+        auto.Margin = new Thickness(0, 10, 0, 0);
         root.Children.Add(auto);
 
         Border ok = new Border();
-        ok.CornerRadius = new CornerRadius(10);
-        ok.Background = PetWindow.B(Cfg.Orange);
+        ok.CornerRadius = new CornerRadius(12);
+        ok.Background = Accent;
         ok.Padding = new Thickness(0, 11, 0, 12);
         ok.Margin = new Thickness(0, 24, 0, 0);
         ok.Cursor = Cursors.Hand;
@@ -276,14 +285,11 @@ class SetupWindow : Window
         root.Children.Add(ok);
 
         hint.FontSize = 12;
-        hint.Foreground = Muted;
+        hint.Foreground = muted;
         hint.TextWrapping = TextWrapping.Wrap;
         hint.TextAlignment = TextAlignment.Center;
         hint.Margin = new Thickness(0, 10, 0, 0);
         root.Children.Add(hint);
-
-        logo.RenderTransformOrigin = new Point(0.5, 1);
-        logo.RenderTransform = new ScaleTransform(1, 1);
 
         Content = root;
         Retext();
@@ -293,12 +299,33 @@ class SetupWindow : Window
         KeyDown += delegate(object s, KeyEventArgs e) { if (e.Key == Key.Enter || e.Key == Key.Escape) Close(); };
         Closed += delegate
         {
-            Cfg.Size = Cfg.SizeVals[Math.Max(0, size.SelectedIndex)];
+            Cfg.Size = Cfg.SizeVals[size.Selected];
             Cfg.Color = color;
-            Cfg.Talk = talk.IsChecked == true;
+            Cfg.Talk = talk.IsOn;
             Cfg.Save();
-            try { Cfg.AutoStart = auto.IsChecked == true; } catch { }
+            try { Cfg.AutoStart = auto.IsOn; } catch { }
         };
+    }
+
+    // Real, live frosted glass behind the whole window (Windows 11 22H2 and newer).
+    // Older Windows keeps the plain background.
+    void MakeGlass()
+    {
+        if (forceLight) return;
+        try
+        {
+            IntPtr h = new WindowInteropHelper(this).Handle;
+            int d = dark ? 1 : 0;
+            DwmSetWindowAttribute(h, 20, ref d, 4);                         // title bar follows light / dark
+            int acrylic = 3;                                                // DWMSBT_TRANSIENTWINDOW
+            if (DwmSetWindowAttribute(h, 38, ref acrylic, 4) != 0) return;  // DWMWA_SYSTEMBACKDROP_TYPE
+            HwndSource.FromHwnd(h).CompositionTarget.BackgroundColor = Colors.Transparent;
+            MARGINS m = new MARGINS();
+            m.L = m.R = m.T = m.B = -1;
+            DwmExtendFrameIntoClientArea(h, ref m);
+            Background = Brushes.Transparent;
+        }
+        catch { }
     }
 
     void Retext()
@@ -308,12 +335,9 @@ class SetupWindow : Window
         lLang.Text = T("Sprache", "Language");
         lSize.Text = T("Größe", "Size");
         lColor.Text = T("Farbe", "Color");
-        int i = size.SelectedIndex;
-        size.Items.Clear();
-        foreach (string l in Cfg.SizeLabels()) size.Items.Add(l);
-        size.SelectedIndex = i < 0 ? Math.Max(0, Array.IndexOf(Cfg.SizeVals, Cfg.Size)) : i;
-        talk.Content = T("Sprechblasen anzeigen", "Show speech bubbles");
-        auto.Content = T("Mit Windows starten", "Start with Windows");
+        size.SetLabels(Cfg.SizeLabels());
+        talk.Label.Text = T("Sprechblasen anzeigen", "Show speech bubbles");
+        auto.Label.Text = T("Mit Windows starten", "Start with Windows");
         okText.Text = T("Los geht's!", "Let's go!");
         hint.Text = T("Alles lässt sich später per Rechtsklick auf Clawd ändern.", "You can change everything later by right-clicking Clawd.");
     }
@@ -325,14 +349,16 @@ class SetupWindow : Window
         {
             UIElement el = root.Children[i];
             if (el == logo) continue;
+            TimeSpan delay = TimeSpan.FromSeconds(0.12 + i * 0.045);
+            el.Opacity = 0;
+            DoubleAnimation fade = Glass.Anim(0, 1, 0.3, Glass.Smooth);
+            fade.BeginTime = delay;
+            el.BeginAnimation(OpacityProperty, fade);
+            if (el.RenderTransform is ScaleTransform) continue; // keeps its own hover animation, so it only fades
             TranslateTransform tr = new TranslateTransform(0, 16);
             el.RenderTransform = tr;
-            el.Opacity = 0;
-            TimeSpan delay = TimeSpan.FromSeconds(0.12 + i * 0.045);
-            DoubleAnimation fade = Glass.Anim(0, 1, 0.3, Glass.Smooth);
             DoubleAnimation move = Glass.Anim(16, 0, 0.45, Glass.Smooth);
-            fade.BeginTime = move.BeginTime = delay;
-            el.BeginAnimation(OpacityProperty, fade);
+            move.BeginTime = delay;
             tr.BeginAnimation(TranslateTransform.YProperty, move);
         }
         Loaded += delegate { Pop(logo); };
@@ -340,7 +366,8 @@ class SetupWindow : Window
 
     static void Zoom(FrameworkElement el, double to, double secs)
     {
-        ScaleTransform sc = (ScaleTransform)el.RenderTransform;
+        ScaleTransform sc = el.RenderTransform as ScaleTransform;
+        if (sc == null) return;
         sc.BeginAnimation(ScaleTransform.ScaleXProperty, Glass.Anim(null, to, secs, Glass.Spring));
         sc.BeginAnimation(ScaleTransform.ScaleYProperty, Glass.Anim(null, to, secs, Glass.Spring));
     }
@@ -348,7 +375,8 @@ class SetupWindow : Window
     // A quick squash-and-bounce.
     static void Pop(FrameworkElement el)
     {
-        ScaleTransform sc = (ScaleTransform)el.RenderTransform;
+        ScaleTransform sc = el.RenderTransform as ScaleTransform;
+        if (sc == null) return;
         double rest = el.IsMouseOver && el is Border ? 1.14 : 1;
         sc.BeginAnimation(ScaleTransform.ScaleXProperty, Glass.Anim(0.8, rest, 0.4, Glass.Spring));
         sc.BeginAnimation(ScaleTransform.ScaleYProperty, Glass.Anim(0.8, rest, 0.4, Glass.Spring));
@@ -360,15 +388,16 @@ class SetupWindow : Window
         foreach (object o in swatches.Children)
         {
             Border b = (Border)o;
-            b.BorderBrush = (string)b.Tag == color ? Ink : Brushes.Transparent;
+            b.BorderBrush = (string)b.Tag == color ? fg : Brushes.Transparent;
         }
         logo.Children.Clear();
         Brush c = PetWindow.B(color);
         Cell(c, 2, 0, 14, 8);
         Cell(c, 0, 3, 18, 2);
         foreach (int lx in new int[] { 3, 5, 12, 14 }) Cell(c, lx, 8, 1, 2);
-        Cell(Ink, 5, 2, 1, 2);
-        Cell(Ink, 12, 2, 1, 2);
+        Brush ink = PetWindow.B("#1A1915");
+        Cell(ink, 5, 2, 1, 2);
+        Cell(ink, 12, 2, 1, 2);
     }
 
     void Cell(Brush b, int cx, int cy, int w, int h)
@@ -382,19 +411,42 @@ class SetupWindow : Window
         logo.Children.Add(r);
     }
 
-    public static void RenderShot(string path)
+    // Developer helper. Default: clean light-mode picture for the README.
+    // live: a real screenshot of the window on screen, glass included.
+    public static void RenderShot(string path, bool live)
     {
         Cfg.ReadOnly = true;
         noAnim = true;
+        forceLight = !live;
         SetupWindow w = new SetupWindow();
         w.ContentRendered += delegate
         {
-            int pw = (int)w.root.ActualWidth + 60, ph = (int)w.root.ActualHeight + 52;
+            if (live)
+            {
+                DispatcherTimer t = new DispatcherTimer();
+                t.Interval = TimeSpan.FromSeconds(1.5);
+                t.Tick += delegate
+                {
+                    t.Stop();
+                    double dpi = PresentationSource.FromVisual(w).CompositionTarget.TransformToDevice.M11;
+                    int sw = (int)(w.ActualWidth * dpi), sh = (int)(w.ActualHeight * dpi);
+                    using (SD.Bitmap bmp = new SD.Bitmap(sw, sh))
+                    {
+                        using (SD.Graphics g = SD.Graphics.FromImage(bmp))
+                            g.CopyFromScreen((int)(w.Left * dpi), (int)(w.Top * dpi), 0, 0, new SD.Size(sw, sh));
+                        bmp.Save(path, SD.Imaging.ImageFormat.Png);
+                    }
+                    w.Close();
+                };
+                t.Start();
+                return;
+            }
+            int pw = (int)w.root.ActualWidth + 60, ph = (int)w.root.ActualHeight + 48;
             DrawingVisual dv = new DrawingVisual();
             using (DrawingContext dc = dv.RenderOpen())
             {
-                dc.DrawRectangle(Paper, null, new Rect(0, 0, pw, ph));
-                dc.DrawRectangle(new VisualBrush(w.root), null, new Rect(30, 26, w.root.ActualWidth, w.root.ActualHeight));
+                dc.DrawRectangle(w.Background, null, new Rect(0, 0, pw, ph));
+                dc.DrawRectangle(new VisualBrush(w.root), null, new Rect(30, 22, w.root.ActualWidth, w.root.ActualHeight));
             }
             RenderTargetBitmap rtb = new RenderTargetBitmap(pw, ph, 96, 96, PixelFormats.Pbgra32);
             rtb.Render(dv);
@@ -404,6 +456,139 @@ class SetupWindow : Window
             w.Close();
         };
         new Application().Run(w);
+    }
+}
+
+// Pill-shaped choice row; the highlight slides to the picked entry.
+class Segments : Grid
+{
+    readonly Border pill = new Border();
+    readonly TranslateTransform slide = new TranslateTransform();
+    readonly List<TextBlock> texts = new List<TextBlock>();
+    readonly Brush fg;
+    public int Selected;
+    public Action<int> Picked;
+
+    public Segments(int count, int selected, Brush track, Brush fg)
+    {
+        this.fg = fg;
+        Selected = selected;
+        Height = 34;
+
+        Border bg = new Border();
+        bg.CornerRadius = new CornerRadius(11);
+        bg.Background = track;
+        Children.Add(bg);
+
+        pill.CornerRadius = new CornerRadius(8);
+        pill.Margin = new Thickness(3);
+        pill.Background = SetupWindow.Accent;
+        pill.HorizontalAlignment = HorizontalAlignment.Left;
+        pill.RenderTransform = slide;
+        Children.Add(pill);
+
+        UniformGrid cells = new UniformGrid();
+        cells.Rows = 1;
+        for (int i = 0; i < count; i++)
+        {
+            int idx = i;
+            TextBlock t = new TextBlock();
+            t.FontSize = 13;
+            t.HorizontalAlignment = HorizontalAlignment.Center;
+            t.VerticalAlignment = VerticalAlignment.Center;
+            Border hit = new Border();
+            hit.Background = Brushes.Transparent;
+            hit.Cursor = Cursors.Hand;
+            hit.Child = t;
+            hit.MouseLeftButtonDown += delegate { Select(idx); };
+            texts.Add(t);
+            cells.Children.Add(hit);
+        }
+        Children.Add(cells);
+        SizeChanged += delegate { Place(false); };
+        Place(false);
+    }
+
+    public void SetLabels(string[] labels)
+    {
+        for (int i = 0; i < texts.Count; i++) texts[i].Text = labels[i];
+    }
+
+    void Select(int i)
+    {
+        if (i == Selected) return;
+        Selected = i;
+        Place(true);
+        if (Picked != null) Picked(i);
+    }
+
+    void Place(bool animate)
+    {
+        for (int i = 0; i < texts.Count; i++)
+        {
+            texts[i].Foreground = i == Selected ? Brushes.White : fg;
+            texts[i].FontWeight = i == Selected ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+        double w = ActualWidth / texts.Count;
+        if (w <= 0) return;
+        pill.Width = Math.Max(0, w - 6);
+        double to = w * Selected;
+        if (animate) slide.BeginAnimation(TranslateTransform.XProperty, Glass.Anim(null, to, 0.32, Glass.Spring));
+        else
+        {
+            slide.BeginAnimation(TranslateTransform.XProperty, null);
+            slide.X = to;
+        }
+    }
+}
+
+// On/off switch with a label; the knob slides over.
+class Toggle : StackPanel
+{
+    readonly Border on = new Border(), knob = new Border();
+    readonly TranslateTransform kx = new TranslateTransform();
+    public readonly TextBlock Label = new TextBlock();
+    public bool IsOn;
+
+    public Toggle(bool start, Brush track, Brush fg)
+    {
+        IsOn = start;
+        Orientation = Orientation.Horizontal;
+        Background = Brushes.Transparent;
+        Cursor = Cursors.Hand;
+
+        Grid sw = new Grid();
+        sw.Width = 40;
+        sw.Height = 22;
+        Border off = new Border();
+        off.CornerRadius = new CornerRadius(11);
+        off.Background = track;
+        on.CornerRadius = new CornerRadius(11);
+        on.Background = SetupWindow.Accent;
+        on.Opacity = start ? 1 : 0;
+        knob.Width = knob.Height = 16;
+        knob.CornerRadius = new CornerRadius(8);
+        knob.Background = Brushes.White;
+        knob.HorizontalAlignment = HorizontalAlignment.Left;
+        knob.Margin = new Thickness(3, 0, 0, 0);
+        knob.RenderTransform = kx;
+        kx.X = start ? 18 : 0;
+        sw.Children.Add(off);
+        sw.Children.Add(on);
+        sw.Children.Add(knob);
+
+        Label.Margin = new Thickness(10, 0, 0, 0);
+        Label.VerticalAlignment = VerticalAlignment.Center;
+        Label.Foreground = fg;
+        Children.Add(sw);
+        Children.Add(Label);
+
+        MouseLeftButtonDown += delegate
+        {
+            IsOn = !IsOn;
+            kx.BeginAnimation(TranslateTransform.XProperty, Glass.Anim(null, IsOn ? 18 : 0, 0.3, Glass.Spring));
+            on.BeginAnimation(OpacityProperty, Glass.Anim(null, IsOn ? 1 : 0, 0.18, Glass.Smooth));
+        };
     }
 }
 
@@ -562,7 +747,7 @@ static class Glass
 </ResourceDictionary>";
 
     // Follows the Windows light / dark app setting.
-    static bool Dark
+    internal static bool Dark
     {
         get
         {
@@ -787,6 +972,8 @@ class PetWindow : Window
     struct LASTINPUTINFO { public uint cbSize, dwTime; }
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
     [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO li);
+    [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+    [DllImport("psapi.dll")] static extern bool EmptyWorkingSet(IntPtr h);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
 
@@ -839,6 +1026,8 @@ class PetWindow : Window
     DispatcherTimer timer;
     ContextMenu menu;
     WF.NotifyIcon tray;
+    ContextMenu trayMenu;
+    Window trayAnchor;
     Pen bubblePen;
     DateTime last = DateTime.UtcNow;
 
@@ -912,6 +1101,8 @@ class PetWindow : Window
         SetWindowLong(h, -20, GetWindowLong(h, -20) | 0x80); // WS_EX_TOOLWINDOW: keep out of Alt+Tab
         PresentationSource src = PresentationSource.FromVisual(this);
         if (src != null && src.CompositionTarget != null) dpi = src.CompositionTarget.TransformToDevice.M11;
+        // The pet is a handful of rectangles: drawing it on the CPU is cheap and saves the memory a GPU surface costs
+        HwndSource.FromHwnd(h).CompositionTarget.RenderMode = RenderMode.SoftwareOnly;
         ApplyScale();
     }
 
@@ -929,6 +1120,18 @@ class PetWindow : Window
         last = DateTime.UtcNow;
         timer.Start();
         if (ShotPath != null) MenuShot();
+
+        // Hand memory we are not touching back to Windows: once after start-up, then now and then
+        DispatcherTimer trim = new DispatcherTimer(DispatcherPriority.Background);
+        trim.Interval = TimeSpan.FromSeconds(6);
+        trim.Tick += delegate
+        {
+            trim.Interval = TimeSpan.FromSeconds(45);
+            if (menu.IsOpen || trayMenu.IsOpen) return;
+            GC.Collect();
+            EmptyWorkingSet(GetCurrentProcess());
+        };
+        trim.Start();
     }
 
     void ApplyScale()
@@ -1086,20 +1289,50 @@ class PetWindow : Window
         tray = new WF.NotifyIcon();
         tray.Text = "Clawd";
         tray.Icon = MakeIcon();
-        WF.ContextMenuStrip cm = new WF.ContextMenuStrip();
-        cm.Items.Add(T("Zeigen / Verstecken", "Show / Hide"), null, delegate { ToggleVisible(); });
-        cm.Items.Add(T("Zurück in die Mitte", "Back to the centre"), null, delegate
+
+        trayMenu = new ContextMenu();
+        Glass.Apply(trayMenu);
+        trayMenu.Items.Add(MI(T("Zeigen / Verstecken", "Show / Hide"), ToggleVisible));
+        trayMenu.Items.Add(MI(T("Zurück in die Mitte", "Back to the centre"), delegate
         {
             if (!IsVisible) Show();
             x = work.Left + work.Width / 2;
             y = work.Bottom - 60 * S;
             Set("fall");
             air = true;
-        });
-        cm.Items.Add(T("Beenden", "Quit"), null, delegate { Close(); });
-        tray.ContextMenuStrip = cm;
+        }));
+        trayMenu.Items.Add(new Separator());
+        trayMenu.Items.Add(MI(T("Beenden", "Quit"), Close));
+        trayMenu.Closed += delegate { if (trayAnchor != null) trayAnchor.Hide(); };
+
+        tray.MouseUp += delegate(object s, WF.MouseEventArgs e) { if (e.Button == WF.MouseButtons.Right) ShowTrayMenu(); };
         tray.DoubleClick += delegate { ToggleVisible(); };
         tray.Visible = true;
+    }
+
+    // A WPF menu only closes on an outside click while one of our windows is active,
+    // so a tiny invisible helper window is activated under the cursor first.
+    void ShowTrayMenu()
+    {
+        if (trayAnchor == null)
+        {
+            trayAnchor = new Window();
+            trayAnchor.WindowStyle = WindowStyle.None;
+            trayAnchor.AllowsTransparency = true;
+            trayAnchor.Background = Brushes.Transparent;
+            trayAnchor.ShowInTaskbar = false;
+            trayAnchor.Topmost = true;
+            trayAnchor.ResizeMode = ResizeMode.NoResize;
+            trayAnchor.Width = trayAnchor.Height = 1;
+        }
+        ReadCursor();
+        trayAnchor.Left = cur.X;
+        trayAnchor.Top = cur.Y;
+        trayAnchor.Show();
+        trayAnchor.Activate();
+        trayMenu.PlacementTarget = trayAnchor;
+        trayMenu.Placement = PlacementMode.MousePoint;
+        trayMenu.IsOpen = true;
     }
 
     void ToggleVisible()
@@ -1310,9 +1543,15 @@ class PetWindow : Window
         UpdateParticles(dt);
         Place();
         view.InvalidateVisual();
+
+        // Full speed only while he flies or is being dragged; otherwise 30 frames, asleep 20
+        double ms = dragging || pressed || air ? 16 : st == "sleep" ? 50 : 33;
+        if (timer.Interval.TotalMilliseconds != ms) timer.Interval = TimeSpan.FromMilliseconds(ms);
     }
 
     Brush Pal() { return Palette[rnd.Next(Palette.Length)]; }
+
+    static readonly string[] Busy = { "drag", "fall", "dizzy", "pet", "eat", "jump", "flip", "climb", "balloon", "chase" };
 
     // Only counts THAT keys are being pressed - never which ones. Nothing is stored or sent.
     void ReadInput(double dt)
@@ -1331,7 +1570,7 @@ class PetWindow : Window
         li.cbSize = 8;
         double idle = GetLastInputInfo(ref li) ? unchecked((uint)Environment.TickCount - li.dwTime) / 1000.0 : 0;
         bool calm = !air && !dragging && !pressed && y >= work.Bottom - 0.5
-            && Array.IndexOf(new string[] { "drag", "fall", "dizzy", "pet", "eat", "jump", "flip", "climb", "balloon", "chase" }, st) < 0;
+            && Array.IndexOf(Busy, st) < 0;
 
         if (hits > 0)
         {

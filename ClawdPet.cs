@@ -959,6 +959,13 @@ class PetView : FrameworkElement
     protected override void OnRender(DrawingContext dc) { Pet.Draw(dc); }
 }
 
+// The speech bubble sits on its own layer so it can have smooth edges while Clawd stays pixel-sharp.
+class BubbleView : FrameworkElement
+{
+    public PetWindow Pet;
+    protected override void OnRender(DrawingContext dc) { Pet.DrawBubble(dc); }
+}
+
 class PetWindow : Window
 {
     // Canvas size in cells (one cell = one "pixel" of Clawd)
@@ -976,6 +983,7 @@ class PetWindow : Window
     [DllImport("psapi.dll")] static extern bool EmptyWorkingSet(IntPtr h);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
     internal static Brush B(string hex)
     {
@@ -1020,6 +1028,7 @@ class PetWindow : Window
 
     readonly Random rnd = new Random();
     readonly PetView view = new PetView();
+    readonly BubbleView bubbleView = new BubbleView();
     readonly List<Particle> parts = new List<Particle>();
     readonly Typeface monoFace = new Typeface(new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
     readonly Typeface bubbleFace = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
@@ -1063,7 +1072,10 @@ class PetWindow : Window
 
     // Speech bubble
     string bubbleText;
-    double bubbleT;
+    double bubbleT, bubbleAge;
+    bool bubbleSit, bubbleShown, dialogOpen;
+    double topT;
+    IntPtr hwnd;
 
     public PetWindow()
     {
@@ -1078,7 +1090,12 @@ class PetWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         view.Pet = this;
         RenderOptions.SetEdgeMode(view, EdgeMode.Aliased);
-        Content = view;
+        bubbleView.Pet = this;
+        bubbleView.IsHitTestVisible = false;
+        Grid layers = new Grid();
+        layers.Children.Add(view);
+        layers.Children.Add(bubbleView);
+        Content = layers;
 
         ApplyScale();
         ApplyColor();
@@ -1097,7 +1114,7 @@ class PetWindow : Window
 
     void OnSourceInit(object s, EventArgs e)
     {
-        IntPtr h = new WindowInteropHelper(this).Handle;
+        IntPtr h = hwnd = new WindowInteropHelper(this).Handle;
         SetWindowLong(h, -20, GetWindowLong(h, -20) | 0x80); // WS_EX_TOOLWINDOW: keep out of Alt+Tab
         PresentationSource src = PresentationSource.FromVisual(this);
         if (src != null && src.CompositionTarget != null) dpi = src.CompositionTarget.TransformToDevice.M11;
@@ -1269,7 +1286,9 @@ class PetWindow : Window
 
     void OpenSetup()
     {
+        dialogOpen = true;
         new SetupWindow().ShowDialog();
+        dialogOpen = false;
         ApplyScale();
         ApplyColor();
         if (!Cfg.Talk) bubbleT = 0;
@@ -1431,6 +1450,7 @@ class PetWindow : Window
         if (!Cfg.Talk) return;
         bubbleText = text;
         bubbleT = secs;
+        bubbleAge = 0;
     }
 
     void Spawn(int kind, double px, double py, double pvx, double pvy, double life, string text, double size, Brush b)
@@ -1536,6 +1556,10 @@ class PetWindow : Window
         ReadCursor();
         anim += dt;
         if (bubbleT > 0) bubbleT -= dt;
+        bubbleAge += dt;
+        if (bubbleT > 0 || bubbleShown) bubbleView.InvalidateVisual();
+        bubbleShown = bubbleT > 0;
+        KeepOnTop(dt);
         blinkT -= dt;
         if (blinkT < -0.13) blinkT = 1.5 + R() * 4;
         ReadInput(dt);
@@ -2044,39 +2068,95 @@ class PetWindow : Window
             dc.Pop();
         }
 
-        if (bubbleT > 0 && bubbleText != null) DrawBubble(dc, sit);
+        bubbleSit = sit;
     }
 
-    void DrawBubble(DrawingContext dc, bool sit)
+    // Glass-style speech bubble: pops in with a little bounce, fades out.
+    public void DrawBubble(DrawingContext dc)
     {
-        FormattedText ft = new FormattedText(bubbleText, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bubbleFace, Math.Max(9, 2.4 * S), ink, dpi);
+        if (bubbleT <= 0 || bubbleText == null) return;
+        bool dark = Glass.Dark;
+        Brush text = dark ? Brushes.White : ink;
+        FormattedText ft = new FormattedText(bubbleText, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bubbleFace, Math.Max(12, 2.5 * S), text, dpi);
         double maxW = 34 * S;
         ft.MaxTextWidth = maxW;
         ft.TextAlignment = TextAlignment.Center;
-        double padX = 1.6 * S, padY = 0.9 * S;
+        double padX = Math.Max(11, 2.2 * S), padY = Math.Max(6, 1.2 * S);
         double bw = ft.Width + 2 * padX, bh = ft.Height + 2 * padY;
         double winW = CW * S, mid = winW / 2;
+        double tail = Math.Max(5, 1.1 * S);
 
         // clamp to the screen first, then to the window
-        double bx = Math.Max(work.Left + bw / 2 + 2, Math.Min(work.Right - bw / 2 - 2, winLeft + mid)) - winLeft;
-        bx = Math.Max(bw / 2 + 1, Math.Min(winW - bw / 2 - 1, bx));
-        double by = (CH - 1) * S - (sit ? 11 : 13) * S - 1.5 * S;
+        double bx = Math.Max(work.Left + bw / 2 + 6, Math.Min(work.Right - bw / 2 - 6, winLeft + mid)) - winLeft;
+        bx = Math.Max(bw / 2 + 6, Math.Min(winW - bw / 2 - 6, bx));
+        double by = (CH - 1) * S - (bubbleSit ? 11 : 13) * S - tail - 0.6 * S;
         Rect r = new Rect(bx - bw / 2, by - bh, bw, bh);
-        double tailX = Math.Max(r.Left + 2 * S, Math.Min(r.Right - 2 * S, mid));
+        double rad = Math.Min(bh / 2, 15);
+        double tailX = Math.Max(r.Left + rad + tail, Math.Min(r.Right - rad - tail, mid));
 
-        dc.PushOpacity(Math.Min(1, bubbleT / 0.3));
-        dc.DrawRoundedRectangle(cream, bubblePen, r, S, S);
+        // pop in from the tail with a slight overshoot
+        double k = Math.Min(1, bubbleAge / 0.3) - 1;
+        double spring = 1 + 2.0 * k * k * k + 1.0 * k * k;
+        double scale = 0.6 + 0.4 * spring;
+        double alpha = Math.Min(1, bubbleAge / 0.1) * Math.Min(1, bubbleT / 0.25);
+
+        dc.PushOpacity(alpha);
+        dc.PushTransform(new ScaleTransform(scale, scale, tailX, by + tail));
+
+        // soft shadow
+        for (int i = 4; i >= 1; i--)
+        {
+            Rect sr = new Rect(r.X - i, r.Y - i + 3, r.Width + 2 * i, r.Height + 2 * i);
+            dc.DrawRoundedRectangle(bubbleShadow, null, sr, rad + i, rad + i);
+        }
+
+        Brush fill = dark ? bubbleDark : bubbleLight;
         StreamGeometry g = new StreamGeometry();
         using (StreamGeometryContext c = g.Open())
         {
-            c.BeginFigure(new Point(tailX - S, by - bubblePen.Thickness), true, false);
-            c.LineTo(new Point(tailX, by + 1.4 * S), true, false);
-            c.LineTo(new Point(tailX + S, by - bubblePen.Thickness), true, false);
+            c.BeginFigure(new Point(tailX - tail, by - 1), true, true);
+            c.LineTo(new Point(tailX, by + tail), true, true);
+            c.LineTo(new Point(tailX + tail, by - 1), true, true);
         }
         g.Freeze();
-        dc.DrawGeometry(cream, bubblePen, g);
-        dc.DrawText(ft, new Point(bx - maxW / 2, r.Top + padY));
+        dc.DrawGeometry(fill, null, g);
+        dc.DrawRoundedRectangle(fill, null, r, rad, rad);
+        dc.DrawRoundedRectangle(bubbleSheen, dark ? bubbleRimDark : bubbleRimLight, new Rect(r.X + 0.5, r.Y + 0.5, r.Width - 1, r.Height - 1), rad, rad);
+        dc.DrawText(ft, new Point(bx - maxW / 2, r.Top + padY - 0.5));
+
         dc.Pop();
+        dc.Pop();
+    }
+
+    static readonly Brush bubbleShadow = B("#12000000"), bubbleDark = B("#EB26262A"), bubbleLight = B("#F5FFFFFF");
+    static readonly Brush bubbleSheen = MakeSheen();
+    static readonly Pen bubbleRimDark = MakeRim("#70FFFFFF", "#18FFFFFF"), bubbleRimLight = MakeRim("#FFFFFFFF", "#30000000");
+
+    static Brush MakeSheen()
+    {
+        LinearGradientBrush b = new LinearGradientBrush(Color.FromArgb(0x30, 255, 255, 255), Color.FromArgb(0, 255, 255, 255), 90);
+        b.Freeze();
+        return b;
+    }
+
+    static Pen MakeRim(string top, string bottom)
+    {
+        LinearGradientBrush b = new LinearGradientBrush((Color)ColorConverter.ConvertFromString(top), (Color)ColorConverter.ConvertFromString(bottom), 90);
+        Pen p = new Pen(b, 1);
+        p.Freeze();
+        return p;
+    }
+
+    // Windows sometimes drops a window out of the "always on top" band (full-screen apps,
+    // taskbar clicks, other pinned windows). Put Clawd back on top once a second.
+    void KeepOnTop(double dt)
+    {
+        topT -= dt;
+        if (topT > 0) return;
+        topT = 1;
+        if (hwnd == IntPtr.Zero || dialogOpen || !IsVisible) return;
+        if ((menu != null && menu.IsOpen) || (trayMenu != null && trayMenu.IsOpen)) return;
+        SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); // TOPMOST, no size / move / activate
     }
 
     // ---------- Developer helper: render a sheet of poses into a PNG ----------
@@ -2088,7 +2168,6 @@ class PetWindow : Window
         int cols = 4, rows = (states.Length + cols - 1) / cols;
         double tw = CW * w.S, th = CH * w.S;
         DrawingVisual dv = new DrawingVisual();
-        RenderOptions.SetEdgeMode(dv, EdgeMode.Aliased);
         using (DrawingContext dc = dv.RenderOpen())
         {
             dc.DrawRectangle(B("#243447"), null, new Rect(0, 0, cols * tw, rows * th));
@@ -2109,6 +2188,8 @@ class PetWindow : Window
                 if (states[i] == "idle") { w.bubbleText = "Hi! I'm Clawd."; w.bubbleT = 3; }
                 dc.PushTransform(new TranslateTransform((i % cols) * tw, (i / cols) * th));
                 w.Draw(dc);
+                w.bubbleAge = 1;
+                w.DrawBubble(dc);
                 dc.Pop();
             }
         }

@@ -22,12 +22,20 @@
 - Walks along the taskbar, hops, dances, waves and stretches
 - Naps (more often at night), drinks coffee, reads a book, puts on sunglasses
 - Follows your mouse pointer with his eyes and blinks
+- **Lands on your windows:** drop or throw him onto a window and he stands and walks on its top edge – and falls down when you drag the window away
 
 **He reacts to you**
 
 - **You type → he types.** Clawd pulls out a laptop and taps a key for every key you press
 - **You're away for 2 minutes → he falls asleep**
 - **You come back → he wakes up and waves**
+- **Sound is playing → he dances**, bouncing harder the louder it gets
+
+**He grows with you**
+
+- **Hunger:** he gets hungry over time and shows a little cookie bubble when he wants food
+- **Levels:** feeding and petting earn XP. New levels unlock tricks (flip, juggling, balloon ride, wall climbing), colors and outfits
+- **Outfits:** beanie, party hat, headphones, top hat and crown, picked from the right-click menu
 
 **You can play with him**
 
@@ -36,10 +44,10 @@
 | Click | Pet him (hearts!) – or wake him up |
 | Double-click | Flip |
 | Drag and release | Pick him up and throw him – he bounces, and gets dizzy after a hard landing |
-| Right-click | Menu: feed, more activities, size, color, language, speech bubbles, start with Windows |
+| Right-click | Menu: level and hunger, feed, activities, outfit, color, size, language, speech bubbles, dance to music, start with Windows |
 | Tray icon | Show / hide, bring him back to the centre, quit |
 
-More tricks are waiting in the right-click menu: juggling, a balloon ride, climbing the edge of the screen, chasing the mouse.
+More tricks are waiting in the right-click menu – some of them only once he has reached the right level.
 
 ## Getting started
 
@@ -74,9 +82,11 @@ Want to record a video? Right-click Clawd → **Demo mode** (or start with `Claw
 
 To type along, the app asks Windows *whether* a key is currently pressed (`GetAsyncKeyState`). It never looks at *which* key, and nothing is stored or sent anywhere – the app does not use the network at all. Some antivirus tools flag this kind of check anyway.
 
+For dancing, the app reads how loud your speakers currently are – just the level, no audio is recorded. To stand on windows, it reads the position of your open windows, not their content.
+
 The right-click menu has a frosted-glass look. For that, the app takes a snapshot of the small screen area behind the menu at the moment it opens and blurs it. The snapshot only lives in memory while the menu is open.
 
-Settings live in `%AppData%\ClawdPet\settings.txt`.
+Settings and progress live in `%AppData%\ClawdPet\settings.txt`.
 
 ## Good to know
 

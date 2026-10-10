@@ -22,12 +22,20 @@
 - Spaziert über die Taskleiste, hüpft, tanzt, winkt und streckt sich
 - Schläft (nachts öfter), trinkt Kaffee, liest ein Buch, setzt die Sonnenbrille auf
 - Folgt deinem Mauszeiger mit den Augen und blinzelt
+- **Landet auf deinen Fenstern:** Lass ihn auf ein Fenster fallen oder wirf ihn drauf – er steht und läuft auf der Oberkante und fällt runter, wenn du das Fenster wegziehst
 
 **Er reagiert auf dich**
 
 - **Du tippst → er tippt.** Clawd holt einen Laptop raus und drückt für jeden deiner Tastendrücke eine Taste
 - **Du bist 2 Minuten weg → er schläft ein**
 - **Du kommst zurück → er wacht auf und winkt**
+- **Es läuft Ton → er tanzt**, und zwar umso wilder, je lauter es ist
+
+**Er wächst mit dir**
+
+- **Hunger:** Mit der Zeit bekommt er Hunger und zeigt eine kleine Keks-Blase, wenn er Futter will
+- **Level:** Füttern und Streicheln geben XP. Neue Level schalten Tricks (Salto, Jonglieren, Ballonfahrt, Wand hochklettern), Farben und Outfits frei
+- **Outfits:** Mütze, Partyhut, Kopfhörer, Zylinder und Krone, auswählbar im Rechtsklick-Menü
 
 **Du kannst mit ihm spielen**
 
@@ -36,10 +44,10 @@
 | Klick | Streicheln (Herzchen!) – oder aufwecken |
 | Doppelklick | Salto |
 | Ziehen und loslassen | Hochheben und werfen – er prallt ab und wird nach hartem Aufprall schwindelig |
-| Rechtsklick | Menü: Füttern, weitere Aktivitäten, Größe, Farbe, Sprache, Sprechblasen, Autostart |
+| Rechtsklick | Menü: Level und Hunger, Füttern, Aktivitäten, Outfit, Farbe, Größe, Sprache, Sprechblasen, zu Musik tanzen, Autostart |
 | Symbol neben der Uhr | Zeigen / Verstecken, zurück in die Mitte, Beenden |
 
-Im Rechtsklick-Menü warten noch mehr Tricks: Jonglieren, eine Ballonfahrt, den Bildschirmrand hochklettern, die Maus jagen.
+Im Rechtsklick-Menü warten noch mehr Tricks – manche erst, wenn er das passende Level erreicht hat.
 
 ## Loslegen
 
@@ -74,9 +82,11 @@ Du willst ein Video aufnehmen? Rechtsklick auf Clawd → **Demo-Modus** (oder St
 
 Zum Mittippen fragt die App Windows, *ob* gerade eine Taste gedrückt ist (`GetAsyncKeyState`). *Welche* Taste es ist, wird nie ausgewertet, und nichts wird gespeichert oder gesendet – die App nutzt das Netzwerk überhaupt nicht. Manche Virenscanner stufen so eine Abfrage trotzdem als verdächtig ein.
 
+Fürs Tanzen liest die App, wie laut deine Lautsprecher gerade sind – nur den Pegel, es wird kein Ton aufgenommen. Um auf Fenstern zu stehen, liest sie die Position deiner offenen Fenster, nicht deren Inhalt.
+
 Das Rechtsklick-Menü hat einen Milchglas-Look. Dafür nimmt die App beim Öffnen ein Bild des kleinen Bildschirmbereichs hinter dem Menü auf und zeichnet es weich. Das Bild liegt nur im Arbeitsspeicher, solange das Menü offen ist.
 
-Die Einstellungen liegen in `%AppData%\ClawdPet\settings.txt`.
+Einstellungen und Fortschritt liegen in `%AppData%\ClawdPet\settings.txt`.
 
 ## Gut zu wissen
 

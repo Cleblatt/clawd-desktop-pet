@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -40,6 +41,15 @@ static class Program
             return;
         }
 
+        if (args.Length == 2 && args[0] == "--log")
+        {
+            // Developer helper: run without the welcome window and write what he is doing to a text file
+            Cfg.Load();
+            Cfg.ReadOnly = true;
+            PetWindow.LogPath = args[1];
+            new Application().Run(new PetWindow());
+            return;
+        }
         if (args.Length == 2 && args[0] == "--menu-shot")
         {
             Cfg.Load();
@@ -80,8 +90,21 @@ static class Cfg
     public static bool ReadOnly;
     public static bool AlwaysSetup; // settings line "setup=always": show the welcome window on every start (handy for recordings)
 
+    // Progress: feeding and petting earn XP; levels unlock tricks, colours and hats
+    public static int Xp;
+    public static double Food = 80;   // 0 = starving, 100 = full
+    public static long Stamp;         // when Food was last written (UTC ticks)
+    public static string Hat = "none";
+    public static bool Music = true;
+
+    public static int Level { get { return 1 + (int)Math.Sqrt(Xp / 15.0); } }
+    public static int XpFor(int level) { return 15 * (level - 1) * (level - 1); }
+
     public static readonly int[] SizeVals = { 3, 5, 7, 10 };
-    public static readonly string[] ColVals = { Orange, "#F06FA8", "#4A90D9", "#3FA66B", "#9B6FE8", "#3DD6D0" };
+    public static readonly string[] ColVals = { Orange, "#F06FA8", "#4A90D9", "#3FA66B", "#9B6FE8", "#3DD6D0", "#E8B923" };
+    public static readonly int[] ColLevel = { 1, 1, 1, 2, 3, 4, 5 };
+    public static readonly string[] HatVals = { "none", "cap", "party", "phones", "tophat", "crown" };
+    public static readonly int[] HatLevel = { 1, 1, 1, 2, 4, 6 };
 
     public static string T(string de, string en) { return Lang == "de" ? de : en; }
 
@@ -92,7 +115,12 @@ static class Cfg
 
     public static string[] ColLabels()
     {
-        return new string[] { "Orange", "Pink", T("Blau", "Blue"), T("Grün", "Green"), T("Lila", "Purple"), T("Türkis", "Teal") };
+        return new string[] { "Orange", "Pink", T("Blau", "Blue"), T("Grün", "Green"), T("Lila", "Purple"), T("Türkis", "Teal"), "Gold" };
+    }
+
+    public static string[] HatLabels()
+    {
+        return new string[] { T("Ohne", "None"), T("Mütze", "Beanie"), T("Partyhut", "Party hat"), T("Kopfhörer", "Headphones"), T("Zylinder", "Top hat"), T("Krone", "Crown") };
     }
 
     static string FilePath
@@ -113,6 +141,17 @@ static class Cfg
                 if (kv[0] == "talk") Talk = kv[1] == "1";
                 if (kv[0] == "setup") AlwaysSetup = kv[1] == "always";
                 if (kv[0] == "color" && kv[1].StartsWith("#")) Color = kv[1];
+                if (kv[0] == "xp") Xp = Math.Max(0, int.Parse(kv[1]));
+                if (kv[0] == "food") Food = Math.Max(0, Math.Min(100, double.Parse(kv[1], CultureInfo.InvariantCulture)));
+                if (kv[0] == "stamp") Stamp = long.Parse(kv[1]);
+                if (kv[0] == "hat" && Array.IndexOf(HatVals, kv[1]) >= 0) Hat = kv[1];
+                if (kv[0] == "music") Music = kv[1] == "1";
+            }
+            // He also gets hungry while the PC is off - but slowly, and never all the way
+            if (Stamp > 0)
+            {
+                double hours = (DateTime.UtcNow - new DateTime(Stamp, DateTimeKind.Utc)).TotalHours;
+                if (hours > 0) Food = Math.Max(Math.Min(Food, 20), Food - hours * 8);
             }
         }
         catch { }
@@ -124,7 +163,8 @@ static class Cfg
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
-            File.WriteAllLines(FilePath, new string[] { "lang=" + Lang, "size=" + Size, "talk=" + (Talk ? "1" : "0"), "color=" + Color, "setup=" + (AlwaysSetup ? "always" : "first") });
+            File.WriteAllLines(FilePath, new string[] { "lang=" + Lang, "size=" + Size, "talk=" + (Talk ? "1" : "0"), "color=" + Color, "setup=" + (AlwaysSetup ? "always" : "first"),
+                "xp=" + Xp, "food=" + Food.ToString("0.#", CultureInfo.InvariantCulture), "stamp=" + DateTime.UtcNow.Ticks, "hat=" + Hat, "music=" + (Music ? "1" : "0") });
         }
         catch { }
     }
@@ -238,22 +278,33 @@ class SetupWindow : Window
 
         root.Children.Add(lColor);
         swatches.Orientation = Orientation.Horizontal;
-        foreach (string v in Cfg.ColVals)
+        for (int ci = 0; ci < Cfg.ColVals.Length; ci++)
         {
-            string val = v;
+            string val = Cfg.ColVals[ci];
+            bool locked = Cfg.ColLevel[ci] > Cfg.Level && val != Cfg.Color;
             Border b = new Border();
             b.Width = b.Height = 34;
             b.CornerRadius = new CornerRadius(10);
-            b.Margin = new Thickness(0, 0, 8, 0);
+            b.Margin = new Thickness(0, 0, 7, 0);
             b.Background = PetWindow.B(val);
             b.BorderThickness = new Thickness(3);
             b.Cursor = Cursors.Hand;
             b.Tag = val;
             b.RenderTransformOrigin = new Point(0.5, 0.5);
             b.RenderTransform = new ScaleTransform(1, 1);
-            b.MouseEnter += delegate { Zoom(b, 1.14, 0.2); };
-            b.MouseLeave += delegate { Zoom(b, 1, 0.25); };
-            b.MouseLeftButtonDown += delegate { color = val; Mark(); Pop(b); Pop(logo); };
+            if (locked)
+            {
+                // unlocked by levelling up
+                b.Opacity = 0.22;
+                b.Cursor = Cursors.Arrow;
+                b.ToolTip = "Level " + Cfg.ColLevel[ci];
+            }
+            else
+            {
+                b.MouseEnter += delegate { Zoom(b, 1.14, 0.2); };
+                b.MouseLeave += delegate { Zoom(b, 1, 0.25); };
+                b.MouseLeftButtonDown += delegate { color = val; Mark(); Pop(b); Pop(logo); };
+            }
             swatches.Children.Add(b);
         }
         root.Children.Add(swatches);
@@ -418,6 +469,7 @@ class SetupWindow : Window
     public static void RenderShot(string path, bool live)
     {
         Cfg.ReadOnly = true;
+        Cfg.Xp = 9999; // show every colour unlocked
         noAnim = true;
         forceLight = !live;
         SetupWindow w = new SetupWindow();
@@ -681,7 +733,7 @@ static class Glass
     <Setter Property='Template'>
       <Setter.Value>
         <ControlTemplate TargetType='MenuItem'>
-          <Grid Background='Transparent' Height='30'>
+          <Grid Background='Transparent' MinHeight='30'>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width='30'/>
               <ColumnDefinition Width='*'/>
@@ -709,6 +761,9 @@ static class Glass
             </Trigger>
             <Trigger Property='HasItems' Value='True'>
               <Setter TargetName='Arrow' Property='Visibility' Value='Visible'/>
+            </Trigger>
+            <Trigger Property='IsEnabled' Value='False'>
+              <Setter Property='Opacity' Value='0.4'/>
             </Trigger>
             <Trigger Property='IsHighlighted' Value='True'>
               <Setter Property='Foreground' Value='White'/>
@@ -912,6 +967,7 @@ static class Glass
     static void OnEnter(object s, MouseEventArgs e)
     {
         MenuItem mi = (MenuItem)s;
+        if (!mi.IsEnabled) return;
         ContentControl host = HostOf(mi);
         if (host == null) return;
         Border hi = Part<Border>(host, "Hi");
@@ -944,6 +1000,68 @@ static class Glass
         DoubleAnimation a = Anim(null, 0, 0.2, Smooth);
         a.BeginTime = TimeSpan.FromSeconds(0.06);
         hi.BeginAnimation(UIElement.OpacityProperty, a);
+    }
+}
+
+// How loud the default speakers are right now (0..1). Only the level is read - nothing is recorded.
+static class Sound
+{
+    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+    class Enumerator { }
+
+    [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceEnumerator
+    {
+        [PreserveSig] int EnumAudioEndpoints(int flow, int mask, out IntPtr devices);
+        [PreserveSig] int GetDefaultAudioEndpoint(int flow, int role, out IMMDevice device);
+    }
+
+    [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDevice
+    {
+        [PreserveSig] int Activate(ref Guid iid, int ctx, IntPtr p, [MarshalAs(UnmanagedType.IUnknown)] out object o);
+    }
+
+    [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioMeterInformation
+    {
+        [PreserveSig] int GetPeakValue(out float peak);
+    }
+
+    static IAudioMeterInformation meter;
+    static DateTime opened;
+
+    public static float Peak()
+    {
+        try
+        {
+            // look the device up again now and then: the default output can change (headphones, HDMI...)
+            if ((DateTime.UtcNow - opened).TotalSeconds > 10) Open();
+            float p;
+            if (meter == null || meter.GetPeakValue(out p) != 0) return 0;
+            return p;
+        }
+        catch
+        {
+            meter = null;
+            return 0;
+        }
+    }
+
+    static void Open()
+    {
+        opened = DateTime.UtcNow;
+        if (meter != null) { Marshal.ReleaseComObject(meter); meter = null; }
+        IMMDeviceEnumerator en = (IMMDeviceEnumerator)new Enumerator();
+        IMMDevice dev;
+        if (en.GetDefaultAudioEndpoint(0, 1, out dev) == 0 && dev != null)
+        {
+            Guid iid = typeof(IAudioMeterInformation).GUID;
+            object o;
+            if (dev.Activate(ref iid, 23, IntPtr.Zero, out o) == 0) meter = o as IAudioMeterInformation;
+            Marshal.ReleaseComObject(dev);
+        }
+        Marshal.ReleaseComObject(en);
     }
 }
 
@@ -985,6 +1103,18 @@ class PetWindow : Window
     [DllImport("psapi.dll")] static extern bool EmptyWorkingSet(IntPtr h);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int L, T, R, B; }
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder sb, int max);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentProcessId();
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int v, int size);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
     internal static Brush B(string hex)
@@ -998,7 +1128,8 @@ class PetWindow : Window
         cream = B("#FAF9F5"), red = B("#E5484D"), yellow = B("#F5C542"), blue = B("#4A90D9"),
         grey = B("#C9C8C2"), greyDark = B("#8A8983"), brown = B("#8B5A2B"), brownDark = B("#5C3A1A"),
         cookie = B("#D9A55B"), gold = B("#E8C76A"), steam = B("#BBFFFFFF"), green = B("#3FA66B"),
-        shine = B("#6E6D68"), purple = B("#9B6FE8"), pink = B("#F06FA8");
+        shine = B("#6E6D68"), purple = B("#9B6FE8"), pink = B("#F06FA8"),
+        hatBlue = B("#3B6FD4"), crownGold = B("#F2B824"), teal = B("#3DD6D0");
     static readonly Brush[] Palette = { red, yellow, blue, green, purple, pink, B("#FF9F43"), B("#3DD6D0") };
 
     static readonly string[] Heart = { ".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..." };
@@ -1062,10 +1193,36 @@ class PetWindow : Window
     // Demo mode: plays every activity in a fixed order (for screen recordings)
     public static bool DemoAtStart;
     public static string ShotPath; // developer helper: screenshot of the open menu
+    public static string LogPath;  // developer helper: status log
+    double logT;
+
+    void Log(string text)
+    {
+        if (LogPath == null) return;
+        try { File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss.f") + " " + text + Environment.NewLine); } catch { }
+    }
     static readonly string[] DemoScript = { "wave", "walk", "code", "coffee", "read", "dance", "jump", "flip", "cool", "juggle", "pet", "eat", "stretch", "sleep", "chase", "climb", "balloon" };
     bool demo = DemoAtStart;
     int demoIdx;
     Brush bodyB = body;
+
+    // Other windows as platforms
+    struct Plat { public IntPtr H; public double L, T, R, B; public bool Stand; }
+    readonly List<Plat> plats = new List<Plat>();
+    readonly StringBuilder cls = new StringBuilder(64);
+    readonly uint myPid = GetCurrentProcessId();
+    EnumProc enumProc;
+    IntPtr perch;      // window he is standing on (Zero = taskbar)
+    double scanT;
+
+    // Music, hunger, level
+    double soundT, level, beat, playT, danceRest;
+    bool musicDance;
+    double petXpT, saveT = 60, hungerNag = 20, hungerShow;
+    TextBlock stLevel, stXp, stFood;
+    Border stXpBar, stFoodBar;
+    MenuItem actsItem;
+    const double StatusW = 176;
 
     // Mouse
     bool pressed, dragging;
@@ -1102,14 +1259,15 @@ class PetWindow : Window
         ApplyScale();
         ApplyColor();
         x = work.Left + work.Width / 2;
-        y = work.Bottom - 60 * S;
+        y = Math.Max(work.Top + 14 * S, work.Bottom - 150 * S);
         Place();
+        enumProc = OnWindow;
 
         view.MouseLeftButtonDown += OnDown;
         view.MouseLeftButtonUp += OnUp;
         SourceInitialized += OnSourceInit;
         Loaded += OnLoaded;
-        Closed += delegate { if (tray != null) { tray.Visible = false; tray.Dispose(); } };
+        Closed += delegate { Cfg.Save(); if (tray != null) { tray.Visible = false; tray.Dispose(); } };
     }
 
     // ---------- Startup ----------
@@ -1190,12 +1348,11 @@ class PetWindow : Window
             }
             else if (step == 2)
             {
-                MenuItem acts = (MenuItem)menu.Items[4];
-                acts.IsSubmenuOpen = true;
+                actsItem.IsSubmenuOpen = true;
             }
             else if (step == 3)
             {
-                int w = 760, h = 640;
+                int w = 760, h = 900;
                 using (SD.Bitmap bmp = new SD.Bitmap(w, h))
                 {
                     using (SD.Graphics g = SD.Graphics.FromImage(bmp))
@@ -1216,8 +1373,8 @@ class PetWindow : Window
         return m;
     }
 
-    // Submenu where exactly one entry is ticked.
-    MenuItem Choice(string header, string[] labels, int selected, Action<int> pick)
+    // Submenu where exactly one entry is ticked. Entries above the current level are shown locked.
+    MenuItem Choice(string header, string[] labels, int selected, Action<int> pick, int[] need = null)
     {
         MenuItem parent = MI(header, null);
         for (int i = 0; i < labels.Length; i++)
@@ -1226,6 +1383,11 @@ class PetWindow : Window
             MenuItem m = MI(labels[i], null);
             m.IsCheckable = true;
             m.IsChecked = i == selected;
+            if (need != null && need[i] > Cfg.Level && !demo && i != selected)
+            {
+                m.Header = labels[i] + "  ·  Level " + need[i];
+                m.IsEnabled = false;
+            }
             m.Click += delegate
             {
                 foreach (object o in parent.Items) ((MenuItem)o).IsChecked = o == m;
@@ -1237,36 +1399,125 @@ class PetWindow : Window
         return parent;
     }
 
+    MenuItem Check(string header, bool on, Action<bool> set)
+    {
+        MenuItem m = MI(header, null);
+        m.IsCheckable = true;
+        m.IsChecked = on;
+        m.Click += delegate { set(m.IsChecked); Cfg.Save(); };
+        return m;
+    }
+
+    static int ActLevel(string name)
+    {
+        return name == "flip" ? 2 : name == "juggle" ? 3 : name == "balloon" ? 4 : name == "climb" ? 5 : 1;
+    }
+
+    Grid Bar(Brush fill, out Border inner)
+    {
+        Grid g = new Grid();
+        g.Height = 5;
+        g.Width = StatusW;
+        Border track = new Border();
+        track.CornerRadius = new CornerRadius(2.5);
+        track.Background = Brushes.Gray;
+        track.Opacity = 0.35;
+        inner = new Border();
+        inner.CornerRadius = new CornerRadius(2.5);
+        inner.Background = fill;
+        inner.HorizontalAlignment = HorizontalAlignment.Left;
+        g.Children.Add(track);
+        g.Children.Add(inner);
+        return g;
+    }
+
+    // Top of the menu: level, XP and how hungry he is.
+    MenuItem StatusItem()
+    {
+        StackPanel sp = new StackPanel();
+        sp.Width = StatusW;
+        sp.Margin = new Thickness(0, 7, 0, 8);
+        Grid top = new Grid();
+        stLevel = new TextBlock();
+        stLevel.FontWeight = FontWeights.Bold;
+        stLevel.FontSize = 14;
+        stXp = new TextBlock();
+        stXp.FontSize = 11;
+        stXp.Opacity = 0.65;
+        stXp.HorizontalAlignment = HorizontalAlignment.Right;
+        stXp.VerticalAlignment = VerticalAlignment.Bottom;
+        top.Children.Add(stLevel);
+        top.Children.Add(stXp);
+        sp.Children.Add(top);
+        Grid xb = Bar(SetupWindow.Accent, out stXpBar);
+        xb.Margin = new Thickness(0, 5, 0, 8);
+        sp.Children.Add(xb);
+        stFood = new TextBlock();
+        stFood.FontSize = 11;
+        stFood.Opacity = 0.65;
+        sp.Children.Add(stFood);
+        Grid fb = Bar(green, out stFoodBar);
+        fb.Margin = new Thickness(0, 4, 0, 0);
+        sp.Children.Add(fb);
+
+        MenuItem m = new MenuItem();
+        m.Header = sp;
+        m.IsHitTestVisible = false;
+        m.Focusable = false;
+        UpdateStatus();
+        return m;
+    }
+
+    void UpdateStatus()
+    {
+        int lv = Cfg.Level, lo = Cfg.XpFor(lv), hi = Cfg.XpFor(lv + 1);
+        stLevel.Text = "Level " + lv;
+        stXp.Text = (Cfg.Xp - lo) + " / " + (hi - lo) + " XP";
+        stXpBar.Width = StatusW * (Cfg.Xp - lo) / (double)(hi - lo);
+        stFood.Text = Cfg.Food < 10 ? T("Sehr hungrig", "Starving") : Cfg.Food < 30 ? T("Hungrig", "Hungry") : Cfg.Food < 85 ? T("Zufrieden", "Content") : T("Satt", "Full");
+        stFoodBar.Width = StatusW * Cfg.Food / 100;
+        stFoodBar.Background = Cfg.Food < 30 ? red : green;
+    }
+
     void BuildMenu()
     {
         menu = new ContextMenu();
         Glass.Apply(menu);
+        menu.Items.Add(StatusItem());
+        menu.Opened += delegate { UpdateStatus(); };
+        menu.Items.Add(new Separator());
         menu.Items.Add(MI(T("Streicheln", "Pet"), PetIt));
-        menu.Items.Add(MI(T("Füttern", "Feed"), delegate { Do("eat"); }));
+        menu.Items.Add(MI(T("Füttern", "Feed"), Feed));
         menu.Items.Add(MI(T("Komm her!", "Come here!"), delegate { Do("chase"); }));
         menu.Items.Add(new Separator());
 
-        MenuItem acts = MI(T("Aktivität", "Activity"), null);
+        actsItem = MI(T("Aktivität", "Activity"), null);
         string[] labels = Cfg.Lang == "de" ? ActLabelsDe : ActLabelsEn;
         for (int i = 0; i < ActNames.Length; i++)
         {
             string name = ActNames[i];
-            acts.Items.Add(MI(labels[i], delegate { Do(name); }));
+            MenuItem a = MI(labels[i], delegate { Do(name); });
+            if (ActLevel(name) > Cfg.Level && !demo)
+            {
+                a.Header = labels[i] + "  ·  Level " + ActLevel(name);
+                a.IsEnabled = false;
+            }
+            actsItem.Items.Add(a);
         }
-        menu.Items.Add(acts);
+        menu.Items.Add(actsItem);
 
+        menu.Items.Add(Choice(T("Outfit", "Outfit"), Cfg.HatLabels(), Array.IndexOf(Cfg.HatVals, Cfg.Hat),
+            delegate(int i) { Cfg.Hat = Cfg.HatVals[i]; }, Cfg.HatLevel));
+        menu.Items.Add(Choice(T("Farbe", "Color"), Cfg.ColLabels(), Array.IndexOf(Cfg.ColVals, Cfg.Color),
+            delegate(int i) { Cfg.Color = Cfg.ColVals[i]; ApplyColor(); }, Cfg.ColLevel));
         menu.Items.Add(Choice(T("Größe", "Size"), Cfg.SizeLabels(), Array.IndexOf(Cfg.SizeVals, Cfg.Size),
             delegate(int i) { Cfg.Size = Cfg.SizeVals[i]; ApplyScale(); }));
-        menu.Items.Add(Choice(T("Farbe", "Color"), Cfg.ColLabels(), Array.IndexOf(Cfg.ColVals, Cfg.Color),
-            delegate(int i) { Cfg.Color = Cfg.ColVals[i]; ApplyColor(); }));
         menu.Items.Add(Choice(T("Sprache", "Language"), new string[] { "Deutsch", "English" }, Cfg.Lang == "de" ? 0 : 1,
             delegate(int i) { Cfg.Lang = i == 0 ? "de" : "en"; bubbleT = 0; RebuildUi(); }));
+        menu.Items.Add(new Separator());
 
-        MenuItem mb = MI(T("Sprechblasen", "Speech bubbles"), null);
-        mb.IsCheckable = true;
-        mb.IsChecked = Cfg.Talk;
-        mb.Click += delegate { Cfg.Talk = mb.IsChecked; if (!Cfg.Talk) bubbleT = 0; Cfg.Save(); };
-        menu.Items.Add(mb);
+        menu.Items.Add(Check(T("Sprechblasen", "Speech bubbles"), Cfg.Talk, delegate(bool on) { Cfg.Talk = on; if (!on) bubbleT = 0; }));
+        menu.Items.Add(Check(T("Zu Musik tanzen", "Dance to music"), Cfg.Music, delegate(bool on) { Cfg.Music = on; }));
 
         MenuItem ma = MI(T("Mit Windows starten", "Start with Windows"), null);
         ma.IsCheckable = true;
@@ -1279,7 +1530,7 @@ class PetWindow : Window
         MenuItem md = MI(T("Demo-Modus", "Demo mode"), null);
         md.IsCheckable = true;
         md.IsChecked = demo;
-        md.Click += delegate { demo = md.IsChecked; demoIdx = 0; if (demo && !dragging) Set("idle"); };
+        md.Click += delegate { demo = md.IsChecked; demoIdx = 0; if (demo && !dragging) Set("idle"); RebuildUi(); };
         menu.Items.Add(md);
         menu.Items.Add(new Separator());
         menu.Items.Add(MI(T("Beenden", "Quit"), Close));
@@ -1318,7 +1569,8 @@ class PetWindow : Window
         {
             if (!IsVisible) Show();
             x = work.Left + work.Width / 2;
-            y = work.Bottom - 60 * S;
+            y = Math.Max(work.Top + 14 * S, work.Bottom - 150 * S);
+            perch = IntPtr.Zero;
             Set("fall");
             air = true;
         }));
@@ -1391,7 +1643,7 @@ class PetWindow : Window
         ReadCursor();
         if (e.ClickCount == 2)
         {
-            if (!air && y >= work.Bottom - 1) Set("flip");
+            if (!air && y >= Ground - 1) Set(Cfg.Level >= ActLevel("flip") || demo ? "flip" : "jump");
             return;
         }
         pressed = true;
@@ -1431,6 +1683,68 @@ class PetWindow : Window
         for (int i = 0; i < 4; i++)
             Spawn(P_HEART, -6 + R() * 12, -11 - R() * 3, (R() - 0.5) * 3, -5 - R() * 3, 1.3 + R() * 0.5, null, 0, Pal());
         Say(Pick(PetLines), 2);
+        if (petXpT <= 0) { petXpT = 8; AddXp(1); }
+    }
+
+    void Feed()
+    {
+        if (dragging) return;
+        hungerShow = 0;
+        if (Cfg.Food >= 85)
+        {
+            Say(T("Ich bin pappsatt!", "I'm stuffed!"), 2.5);
+            return;
+        }
+        Set("eat");
+        Cfg.Food = Math.Min(100, Cfg.Food + 35);
+        AddXp(5);
+    }
+
+    void AddXp(int n)
+    {
+        if (demo) return;
+        int before = Cfg.Level;
+        Cfg.Xp += n;
+        Spawn(P_TEXT, 0, -15 - HatH(), 0, -4, 1.5, "+" + n + " XP", 2.3, yellow);
+        if (Cfg.Level > before) LevelUp();
+        Cfg.Save();
+    }
+
+    void LevelUp()
+    {
+        int lv = Cfg.Level;
+        for (int i = 0; i < 26; i++)
+            Spawn(P_CRUMB, -10 + R() * 20, -12 - R() * 8, (R() - 0.5) * 22, -6 - R() * 12, 1.2 + R() * 0.8, null, 0, Pal());
+        List<string> news = new List<string>();
+        string[] al = Cfg.Lang == "de" ? ActLabelsDe : ActLabelsEn, cl = Cfg.ColLabels(), hl = Cfg.HatLabels();
+        for (int i = 0; i < ActNames.Length; i++) if (ActLevel(ActNames[i]) == lv) news.Add(al[i]);
+        for (int i = 0; i < cl.Length; i++) if (Cfg.ColLevel[i] == lv) news.Add(cl[i]);
+        for (int i = 0; i < hl.Length; i++) if (Cfg.HatLevel[i] == lv) news.Add(hl[i]);
+        string text = "Level " + lv + "!";
+        if (news.Count > 0) text += "\n" + T("Neu: ", "New: ") + string.Join(", ", news.ToArray());
+        Announce(text, 5);
+        RebuildUi();
+    }
+
+    // Like Say, but also shown when speech bubbles are switched off (level-ups).
+    void Announce(string text, double secs)
+    {
+        bubbleText = text;
+        bubbleT = secs;
+        bubbleAge = 0;
+    }
+
+    double HatH()
+    {
+        switch (Cfg.Hat)
+        {
+            case "cap": return 5;
+            case "party": return 7;
+            case "phones": return 2;
+            case "tophat": return 6;
+            case "crown": return 5;
+        }
+        return 0;
     }
 
     void Do(string name)
@@ -1445,7 +1759,20 @@ class PetWindow : Window
     string Pick(string[] a) { return a[rnd.Next(a.Length)]; }
     string Pick(string[][] a) { return Pick(a[Cfg.Lang == "de" ? 0 : 1]); }
     double Sn(double v) { return Math.Round(v * dpi) / dpi; }
-    double RandX() { return work.Left + 12 * S + R() * (work.Width - 24 * S); }
+    double RandX()
+    {
+        double lo = work.Left + 12 * S, hi = work.Right - 12 * S;
+        foreach (Plat p in plats)
+        {
+            if (p.H != perch) continue;
+            // now and then he strolls off the edge and drops down
+            if (R() < 0.2) return Math.Max(lo, Math.Min(hi, R() < 0.5 ? p.L - 10 * S : p.R + 10 * S));
+            lo = Math.Max(lo, p.L + 8 * S);
+            hi = Math.Min(hi, p.R - 8 * S);
+            break;
+        }
+        return hi > lo ? lo + R() * (hi - lo) : x;
+    }
 
     void Say(string text, double secs)
     {
@@ -1489,7 +1816,7 @@ class PetWindow : Window
 
     void Set(string s)
     {
-        st = s; t = 0; phase = 0; rot = 0; spawnT = 0; hopT = 0;
+        st = s; t = 0; phase = 0; rot = 0; spawnT = 0; hopT = 0; musicDance = false;
         side = x < work.Left + work.Width / 2 ? -1 : 1;
         switch (s)
         {
@@ -1559,12 +1886,27 @@ class PetWindow : Window
         anim += dt;
         if (bubbleT > 0) bubbleT -= dt;
         bubbleAge += dt;
-        if (bubbleT > 0 || bubbleShown) bubbleView.InvalidateVisual();
-        bubbleShown = bubbleT > 0;
+        bool bubble = bubbleT > 0 || hungerShow > 0;
+        if (bubble || bubbleShown) bubbleView.InvalidateVisual();
+        bubbleShown = bubble;
         KeepOnTop(dt);
         blinkT -= dt;
         if (blinkT < -0.13) blinkT = 1.5 + R() * 4;
+        logT -= dt;
+        if (logT <= 0 && LogPath != null)
+        {
+            logT = 1;
+            Log(st + " x=" + (int)x + " y=" + (int)y + " air=" + air + " windows=" + plats.Count + " sound=" + level.ToString("0.000") + " playing=" + playT.ToString("0.0") + " level=" + Cfg.Level + " food=" + (int)Cfg.Food);
+        }
         ReadInput(dt);
+        UpdateNeeds(dt);
+        UpdateMusic(dt);
+        scanT -= dt;
+        if (scanT <= 0)
+        {
+            scanT = air || dragging ? 0.08 : 0.25;
+            ScanWindows();
+        }
         if (menu == null || !menu.IsOpen) UpdatePet(dt);
         UpdateParticles(dt);
         Place();
@@ -1578,6 +1920,136 @@ class PetWindow : Window
     Brush Pal() { return Palette[rnd.Next(Palette.Length)]; }
 
     static readonly string[] Busy = { "drag", "fall", "dizzy", "pet", "eat", "jump", "flip", "climb", "balloon", "chase" };
+
+    bool Calm()
+    {
+        return !air && !dragging && !pressed && y >= Ground - 0.5 && Array.IndexOf(Busy, st) < 0;
+    }
+
+    // Hunger grows slowly while the app runs; when it gets bad he asks for food.
+    void UpdateNeeds(double dt)
+    {
+        petXpT -= dt;
+        hungerShow -= dt;
+        if (demo) return;
+        Cfg.Food = Math.Max(0, Cfg.Food - dt * 100 / 9000); // full -> empty in about 2.5 hours
+        saveT -= dt;
+        if (saveT <= 0) { saveT = 60; Cfg.Save(); }
+        if (Cfg.Food >= 30) { hungerNag = 5; return; }
+        hungerNag -= dt;
+        if (hungerNag > 0 || bubbleT > 0 || dragging || air || st == "sleep" || st == "eat") return;
+        hungerNag = Cfg.Food < 10 ? 25 : 60;
+        hungerShow = 5;
+        bubbleAge = 0;
+        Say(T("Ich hab Hunger!", "I'm hungry!"), 4);
+    }
+
+    // When sound has been playing for a few seconds he starts dancing - in bouts, not non-stop.
+    void UpdateMusic(double dt)
+    {
+        if (!Cfg.Music || demo) { beat = 0; playT = 0; return; }
+        soundT -= dt;
+        if (soundT <= 0) { soundT = 0.1; level = Sound.Peak(); }
+        beat = level > beat ? level : Math.Max(0, beat - dt * 2.5);
+        // fills up while there is sound and drains in silence, so single beeps and clicks do not count
+        playT = Math.Max(0, Math.Min(6, playT + (level > 0.03 ? dt : -1.5 * dt)));
+        danceRest -= dt;
+        bool music = playT > (st == "dance" && musicDance ? 1 : 3);
+        if (st == "dance" && musicDance && !music) Set("idle");
+        if (music && danceRest <= 0 && (st == "idle" || st == "walk") && Calm())
+        {
+            Set("dance");
+            musicDance = true;
+            dur = 10 + R() * 8;
+            danceRest = dur + 20 + R() * 25;
+        }
+    }
+
+    // ---------- Other windows as platforms ----------
+
+    // Collects the visible app windows, front to back.
+    void ScanWindows()
+    {
+        plats.Clear();
+        try { EnumWindows(enumProc, IntPtr.Zero); } catch { }
+    }
+
+    bool OnWindow(IntPtr h, IntPtr l)
+    {
+        if (!IsWindowVisible(h) || IsIconic(h)) return true;
+        uint pid;
+        GetWindowThreadProcessId(h, out pid);
+        if (pid == myPid) return true;
+        int ex = GetWindowLong(h, -20);
+        if ((ex & 0x80) != 0 || (ex & 0x20) != 0) return true;              // tool windows, click-through overlays
+        int cloaked;
+        if (DwmGetWindowAttribute(h, 14, out cloaked, 4) == 0 && cloaked != 0) return true; // hidden store apps, other desktops
+        RECT r;
+        if (DwmGetWindowAttribute(h, 9, out r, 16) != 0) return true;       // the visible frame, without the invisible resize border
+        Plat p = new Plat();
+        p.H = h;
+        p.L = r.L / dpi; p.T = r.T / dpi; p.R = r.R / dpi; p.B = r.B / dpi;
+        if (p.R - p.L < 2 || p.B - p.T < 2) return true;
+        cls.Length = 0;
+        GetClassName(h, cls, 64);
+        string c = cls.ToString();
+        if (c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd") return true;
+        // good to stand on: a normal window with room above it for Clawd
+        p.Stand = !IsZoomed(h) && p.R - p.L >= 30 * S && p.T - 13 * S >= work.Top && p.T <= work.Bottom - 6 * S;
+        plats.Add(p);
+        return true;
+    }
+
+    // Is the spot (px, top edge) of window number i hidden behind a window in front of it?
+    bool Covered(int i, double px, double py)
+    {
+        for (int j = 0; j < i; j++)
+        {
+            Plat q = plats[j];
+            if (px >= q.L && px <= q.R && py + 1 >= q.T && py + 1 <= q.B) return true;
+        }
+        return false;
+    }
+
+    // What he is standing on right now: a window's top edge or the taskbar.
+    double Ground
+    {
+        get
+        {
+            if (perch != IntPtr.Zero)
+                foreach (Plat p in plats)
+                    if (p.H == perch) return p.T;
+            return work.Bottom;
+        }
+    }
+
+    bool PerchOk()
+    {
+        for (int i = 0; i < plats.Count; i++)
+        {
+            Plat p = plats[i];
+            if (p.H != perch) continue;
+            return p.Stand && Math.Abs(p.T - y) < 1.5 && x >= p.L + S && x <= p.R - S && !Covered(i, x, p.T);
+        }
+        return false;
+    }
+
+    // First surface he hits while dropping from y0 to y1.
+    bool FindSurface(double px, double y0, double y1, out double top, out IntPtr h)
+    {
+        top = double.MaxValue;
+        h = IntPtr.Zero;
+        if (y1 >= work.Bottom) top = work.Bottom;
+        for (int i = 0; i < plats.Count; i++)
+        {
+            Plat p = plats[i];
+            if (!p.Stand || p.T < y0 - 0.5 || p.T > y1 || p.T >= top) continue;
+            if (px < p.L + 2 * S || px > p.R - 2 * S || Covered(i, px, p.T)) continue;
+            top = p.T;
+            h = p.H;
+        }
+        return top != double.MaxValue;
+    }
 
     // Only counts THAT keys are being pressed - never which ones. Nothing is stored or sent.
     void ReadInput(double dt)
@@ -1595,8 +2067,7 @@ class PetWindow : Window
         LASTINPUTINFO li = new LASTINPUTINFO();
         li.cbSize = 8;
         double idle = GetLastInputInfo(ref li) ? unchecked((uint)Environment.TickCount - li.dwTime) / 1000.0 : 0;
-        bool calm = !air && !dragging && !pressed && y >= work.Bottom - 0.5
-            && Array.IndexOf(Busy, st) < 0;
+        bool calm = Calm();
 
         if (hits > 0)
         {
@@ -1639,6 +2110,7 @@ class PetWindow : Window
 
     void Physics(double dt)
     {
+        double y0 = y;
         vy += 260 * S * dt;
         x += vx * dt;
         y += vy * dt;
@@ -1646,8 +2118,12 @@ class PetWindow : Window
         if (x < minX) { x = minX; vx = -vx * 0.6; }
         if (x > maxX) { x = maxX; vx = -vx * 0.6; }
         if (y < work.Top + 12 * S) { y = work.Top + 12 * S; vy = Math.Abs(vy) * 0.5; }
-        if (y < work.Bottom) return;
-        y = work.Bottom;
+        if (vy < 0) return; // still on the way up
+
+        double top;
+        IntPtr h;
+        if (!FindSurface(x, y0, y, out top, out h)) return;
+        y = top;
         if (st == "fall" && vy > 60 * S)
         {
             if (vy > maxImpact) maxImpact = vy;
@@ -1655,6 +2131,8 @@ class PetWindow : Window
             vx *= 0.7;
             return;
         }
+        perch = h;
+        Log("landed on " + (h == IntPtr.Zero ? "taskbar" : "window " + h) + " at y=" + (int)y);
         vx = vy = 0;
         air = false;
         if (st == "jump")
@@ -1674,7 +2152,6 @@ class PetWindow : Window
     {
         t += dt;
         moving = false;
-        double ground = work.Bottom;
 
         if (pressed && !dragging)
         {
@@ -1683,6 +2160,7 @@ class PetWindow : Window
             {
                 dragging = true;
                 air = false;
+                perch = IntPtr.Zero;
                 Set("drag");
             }
         }
@@ -1700,6 +2178,18 @@ class PetWindow : Window
         }
 
         bool floating = st == "climb" || st == "balloon";
+        // The window under him was moved, closed or covered: down he goes
+        if (perch != IntPtr.Zero && !air && !PerchOk())
+        {
+            perch = IntPtr.Zero;
+            Log("lost the window under him");
+            if (!floating)
+            {
+                Set("fall");
+                air = true;
+            }
+        }
+        double ground = Ground;
         if (!air && !floating && y < ground - 0.5) air = true;
         if (air) Physics(dt);
 
@@ -1844,6 +2334,53 @@ class PetWindow : Window
         dc.DrawText(ft, new Point(ox + cx * S - ft.Width / 2, oy + cy * S - ft.Height / 2));
     }
 
+    // Permanent outfit, sitting on top of the head (top = upper edge of the body).
+    void DrawHat(DrawingContext dc, double top)
+    {
+        switch (Cfg.Hat)
+        {
+            case "cap":
+                C(dc, white, -1, top - 5, 2, 1);
+                C(dc, hatBlue, -3, top - 4, 6, 1);
+                C(dc, hatBlue, -5, top - 3, 10, 1);
+                C(dc, hatBlue, -6, top - 2, 12, 1);
+                C(dc, white, -6.5, top - 1, 13, 1.2);
+                break;
+            case "party":
+                C(dc, yellow, -0.5, top - 7, 1, 1);
+                C(dc, pink, -0.5, top - 6, 1, 1);
+                C(dc, blue, -1, top - 5, 2, 1);
+                C(dc, pink, -1.5, top - 4, 3, 1);
+                C(dc, blue, -2, top - 3, 4, 1);
+                C(dc, pink, -2.5, top - 2, 5, 1);
+                C(dc, blue, -3, top - 1, 6, 1);
+                break;
+            case "phones":
+                C(dc, ink, -6.5, top - 1.6, 13, 1.1);
+                C(dc, ink, -8, top - 1, 1.5, 1.6);
+                C(dc, ink, 6.5, top - 1, 1.5, 1.6);
+                C(dc, ink, -8.6, top + 0.5, 1.6, 2.5);
+                C(dc, ink, 7, top + 0.5, 1.6, 2.5);
+                C(dc, teal, -8.6, top + 1, 0.6, 1.5);
+                C(dc, teal, 8, top + 1, 0.6, 1.5);
+                break;
+            case "tophat":
+                C(dc, ink, -3.5, top - 6, 7, 5);
+                C(dc, red, -3.5, top - 2.2, 7, 1.2);
+                C(dc, ink, -5.5, top - 1, 11, 1);
+                break;
+            case "crown":
+                C(dc, crownGold, -4.5, top - 4, 1.5, 2);
+                C(dc, crownGold, -0.75, top - 4.6, 1.5, 2.6);
+                C(dc, crownGold, 3, top - 4, 1.5, 2);
+                C(dc, crownGold, -4.5, top - 2, 9, 2);
+                C(dc, red, -0.5, top - 1.5, 1, 1);
+                C(dc, blue, -3.3, top - 1.5, 1, 1);
+                C(dc, blue, 2.3, top - 1.5, 1, 1);
+                break;
+        }
+    }
+
     void Eye(DrawingContext dc, int mode, double ex, double ey)
     {
         // ex = left edge of the 1-cell-wide eye
@@ -1903,7 +2440,8 @@ class PetWindow : Window
                 aL = aR = 2;
                 break;
             case "dance":
-                lift = -Math.Abs(Math.Sin(anim * 6)) * 1.5;
+                // with music the bounce follows how loud it is
+                lift = -Math.Abs(Math.Sin(anim * 6)) * 1.5 * (musicDance ? 0.45 + Math.Min(1.2, beat * 4) : 1);
                 sway = Math.Sin(anim * 3) * 1.5;
                 if (Math.Sin(anim * 3) > 0) aL = -3; else aR = -3;
                 eye = EYE_HAPPY; lx = ly = 0;
@@ -2004,6 +2542,8 @@ class PetWindow : Window
             C(dc, shine, 2, gy + 1, 1, 1);
         }
 
+        DrawHat(dc, bodyTop);
+
         switch (st)
         {
             case "code":
@@ -2076,7 +2616,11 @@ class PetWindow : Window
     // Glass-style speech bubble: pops in with a little bounce, fades out.
     public void DrawBubble(DrawingContext dc)
     {
-        if (bubbleT <= 0 || bubbleText == null) return;
+        if (bubbleT <= 0 || bubbleText == null)
+        {
+            DrawHunger(dc);
+            return;
+        }
         bool dark = Glass.Dark;
         Brush text = dark ? Brushes.White : ink;
         FormattedText ft = new FormattedText(bubbleText, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bubbleFace, Math.Max(12, 2.5 * S), text, dpi);
@@ -2091,7 +2635,7 @@ class PetWindow : Window
         // clamp to the screen first, then to the window
         double bx = Math.Max(work.Left + bw / 2 + 6, Math.Min(work.Right - bw / 2 - 6, winLeft + mid)) - winLeft;
         bx = Math.Max(bw / 2 + 6, Math.Min(winW - bw / 2 - 6, bx));
-        double by = (CH - 1) * S - (bubbleSit ? 11 : 13) * S - tail - 0.6 * S;
+        double by = (CH - 1) * S - (bubbleSit ? 11 : 13) * S - HatH() * S - tail - 0.6 * S;
         Rect r = new Rect(bx - bw / 2, by - bh, bw, bh);
         double rad = Math.Min(bh / 2, 15);
         double tailX = Math.Max(r.Left + rad + tail, Math.Min(r.Right - rad - tail, mid));
@@ -2126,6 +2670,37 @@ class PetWindow : Window
         dc.DrawRoundedRectangle(bubbleSheen, dark ? bubbleRimDark : bubbleRimLight, new Rect(r.X + 0.5, r.Y + 0.5, r.Width - 1, r.Height - 1), rad, rad);
         dc.DrawText(ft, new Point(bx - maxW / 2, r.Top + padY - 0.5));
 
+        dc.Pop();
+        dc.Pop();
+    }
+
+    // "I'm hungry": a small thought bubble with a cookie in it. Shown even when speech bubbles are off.
+    void DrawHunger(DrawingContext dc)
+    {
+        if (hungerShow <= 0) return;
+        bool dark = Glass.Dark;
+        Brush fill = dark ? bubbleDark : bubbleLight;
+        double mid = CW * S / 2, r = Math.Max(14, 3.3 * S);
+        double feet = (CH - 1) * S - (bubbleSit ? 11 : 13) * S - HatH() * S;
+        double cy = feet - r - 2.2 * S;
+        double k = Math.Min(1, bubbleAge / 0.3) - 1;
+        double scale = 0.6 + 0.4 * (1 + 2.0 * k * k * k + 1.0 * k * k);
+        double alpha = Math.Min(1, bubbleAge / 0.1) * Math.Min(1, hungerShow / 0.25);
+
+        dc.PushOpacity(alpha);
+        dc.PushTransform(new ScaleTransform(scale, scale, mid, feet));
+        for (int i = 4; i >= 1; i--) dc.DrawEllipse(bubbleShadow, null, new Point(mid, cy + 3), r + i, r + i);
+        dc.DrawEllipse(fill, null, new Point(mid - 0.5 * r, feet - 0.6 * S), 0.5 * S, 0.5 * S);
+        dc.DrawEllipse(fill, null, new Point(mid - 0.3 * r, feet - 1.7 * S), 0.8 * S, 0.8 * S);
+        dc.DrawEllipse(fill, dark ? bubbleRimDark : bubbleRimLight, new Point(mid, cy), r, r);
+        double u = Math.Round(r * 0.3);
+        for (int row = 0; row < Cookie.Length; row++)
+            for (int col = 0; col < Cookie[row].Length; col++)
+            {
+                char ch = Cookie[row][col];
+                if (ch == '.') continue;
+                dc.DrawRectangle(ch == 'X' ? cookie : brownDark, null, new Rect(Math.Round(mid - 2 * u) + col * u, Math.Round(cy - 2 * u) + row * u, u, u));
+            }
         dc.Pop();
         dc.Pop();
     }
@@ -2188,6 +2763,8 @@ class PetWindow : Window
                 if (states[i] == "code") { w.typed = true; w.tapT = 0.1; w.Spawn(P_TEXT, -3, -13, 0, 0, 2, "{ }", 2.2, green); w.Spawn(P_TEXT, 5, -16, 0, 0, 2, "</>", 2.2, yellow); }
                 if (states[i] == "dance") { w.Spawn(P_TEXT, -9, -15, 0, 0, 2, "\u266A", 3, pink); w.Spawn(P_TEXT, 8, -17, 0, 0, 2, "\u266B", 3, blue); }
                 if (states[i] == "idle") { w.bubbleText = "Hi! I'm Clawd."; w.bubbleT = 3; }
+                Cfg.Hat = states[i] == "idle" ? "crown" : states[i] == "walk" ? "cap" : states[i] == "dance" ? "phones"
+                    : states[i] == "wave" ? "party" : states[i] == "cool" ? "tophat" : "none";
                 dc.PushTransform(new TranslateTransform((i % cols) * tw, (i / cols) * th));
                 w.Draw(dc);
                 w.bubbleAge = 1;

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -41,6 +42,12 @@ static class Program
             return;
         }
 
+        if (args.Length == 2 && args[0] == "--admin-shot")
+        {
+            Cfg.Load();
+            PasswordWindow.Shot(args[1]);
+            return;
+        }
         if (args.Length == 2 && args[0] == "--log")
         {
             // Developer helper: run without the welcome window and write what he is doing to a text file
@@ -192,11 +199,6 @@ static class Cfg
 // First-run / settings dialog: language, size, colour and a few switches.
 class SetupWindow : Window
 {
-    [StructLayout(LayoutKind.Sequential)]
-    struct MARGINS { public int L, R, T, B; }
-    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int val, int size);
-    [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
-
     internal static readonly Brush Accent = PetWindow.B(Cfg.Orange);
     static bool noAnim, forceLight;
 
@@ -364,21 +366,7 @@ class SetupWindow : Window
     // Older Windows keeps the plain background.
     void MakeGlass()
     {
-        if (forceLight) return;
-        try
-        {
-            IntPtr h = new WindowInteropHelper(this).Handle;
-            int d = dark ? 1 : 0;
-            DwmSetWindowAttribute(h, 20, ref d, 4);                         // title bar follows light / dark
-            int acrylic = 3;                                                // DWMSBT_TRANSIENTWINDOW
-            if (DwmSetWindowAttribute(h, 38, ref acrylic, 4) != 0) return;  // DWMWA_SYSTEMBACKDROP_TYPE
-            HwndSource.FromHwnd(h).CompositionTarget.BackgroundColor = Colors.Transparent;
-            MARGINS m = new MARGINS();
-            m.L = m.R = m.T = m.B = -1;
-            DwmExtendFrameIntoClientArea(h, ref m);
-            Background = Brushes.Transparent;
-        }
-        catch { }
+        if (!forceLight && Glass.Backdrop(this, dark)) Background = Brushes.Transparent;
     }
 
     void Retext()
@@ -510,6 +498,138 @@ class SetupWindow : Window
             w.Close();
         };
         new Application().Run(w);
+    }
+}
+
+// Small glass prompt for the admin password.
+class PasswordWindow : Window
+{
+    // SHA-256 of the admin password. The password itself is not in the code.
+    const string Hash = "def311f008e18477bb13f6bf75a15739b90be4fa579c06815193d56ab08e6cd0";
+
+    readonly PasswordBox box = new PasswordBox();
+    readonly Border field = new Border();
+    public bool Ok;
+
+    public PasswordWindow()
+    {
+        bool dark = Glass.Dark;
+        Brush fg = dark ? Brushes.White : PetWindow.B("#1A1915");
+        Title = "Clawd";
+        Width = 320;
+        SizeToContent = SizeToContent.Height;
+        ResizeMode = ResizeMode.NoResize;
+        Topmost = true;
+        Background = PetWindow.B(dark ? "#202023" : "#FAF9F5");
+        Foreground = fg;
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
+        FontSize = 14;
+        UseLayoutRounding = true;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - 320) / 2;
+        Top = SystemParameters.WorkArea.Top + SystemParameters.WorkArea.Height * 0.34;
+        SourceInitialized += delegate { if (Glass.Backdrop(this, dark)) Background = Brushes.Transparent; };
+
+        StackPanel root = new StackPanel();
+        root.Margin = new Thickness(24, 16, 24, 22);
+
+        TextBlock head = new TextBlock();
+        head.Text = Cfg.T("Admin-Bereich", "Admin area");
+        head.FontSize = 19;
+        head.FontWeight = FontWeights.Bold;
+        root.Children.Add(head);
+
+        TextBlock sub = new TextBlock();
+        sub.Text = Cfg.T("Passwort eingeben", "Enter the password");
+        sub.Foreground = PetWindow.B(dark ? "#B4FFFFFF" : "#6E6D68");
+        sub.Margin = new Thickness(0, 3, 0, 0);
+        root.Children.Add(sub);
+
+        field.CornerRadius = new CornerRadius(10);
+        field.Background = PetWindow.B(dark ? "#24FFFFFF" : "#16000000");
+        field.Padding = new Thickness(10, 6, 10, 6);
+        field.Margin = new Thickness(0, 14, 0, 0);
+        box.Background = Brushes.Transparent;
+        box.BorderThickness = new Thickness(0);
+        box.Foreground = fg;
+        box.CaretBrush = fg;
+        box.FontSize = 15;
+        field.Child = box;
+        root.Children.Add(field);
+
+        Border ok = new Border();
+        ok.CornerRadius = new CornerRadius(12);
+        ok.Background = SetupWindow.Accent;
+        ok.Padding = new Thickness(0, 9, 0, 10);
+        ok.Margin = new Thickness(0, 16, 0, 0);
+        ok.Cursor = Cursors.Hand;
+        TextBlock okText = new TextBlock();
+        okText.Text = "OK";
+        okText.Foreground = Brushes.White;
+        okText.FontWeight = FontWeights.Bold;
+        okText.HorizontalAlignment = HorizontalAlignment.Center;
+        ok.Child = okText;
+        ok.MouseLeftButtonUp += delegate { Check(); };
+        root.Children.Add(ok);
+
+        Content = root;
+        Loaded += delegate { box.Focus(); };
+        KeyDown += delegate(object s, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) Check();
+            if (e.Key == Key.Escape) Close();
+        };
+    }
+
+    // Developer helper: screenshot of this prompt on screen.
+    public static void Shot(string path)
+    {
+        PasswordWindow w = new PasswordWindow();
+        w.ContentRendered += delegate
+        {
+            DispatcherTimer t = new DispatcherTimer();
+            t.Interval = TimeSpan.FromSeconds(1.2);
+            t.Tick += delegate
+            {
+                t.Stop();
+                double dpi = PresentationSource.FromVisual(w).CompositionTarget.TransformToDevice.M11;
+                int sw = (int)(w.ActualWidth * dpi), sh = (int)(w.ActualHeight * dpi);
+                using (SD.Bitmap bmp = new SD.Bitmap(sw, sh))
+                {
+                    using (SD.Graphics g = SD.Graphics.FromImage(bmp))
+                        g.CopyFromScreen((int)(w.Left * dpi), (int)(w.Top * dpi), 0, 0, new SD.Size(sw, sh));
+                    bmp.Save(path, SD.Imaging.ImageFormat.Png);
+                }
+                w.Close();
+            };
+            t.Start();
+        };
+        new Application().Run(w);
+    }
+
+    void Check()
+    {
+        string hex;
+        using (SHA256 sha = SHA256.Create())
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (byte b in sha.ComputeHash(Encoding.UTF8.GetBytes(box.Password))) sb.Append(b.ToString("x2"));
+            hex = sb.ToString();
+        }
+        if (hex == Hash)
+        {
+            Ok = true;
+            Close();
+            return;
+        }
+        // wrong: clear the field and give it a shake
+        box.Clear();
+        TranslateTransform tr = new TranslateTransform();
+        field.RenderTransform = tr;
+        ElasticEase wobble = new ElasticEase();
+        wobble.Oscillations = 3;
+        wobble.Springiness = 4;
+        tr.BeginAnimation(TranslateTransform.XProperty, Glass.Anim(-12, 0, 0.5, wobble));
     }
 }
 
@@ -652,8 +772,33 @@ static class Glass
 {
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr h);
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct MARGINS { public int L, R, T, B; }
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int val, int size);
+    [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
+
     const double Pad = 40, Radius = 14;
     static bool hooked;
+
+    // Real, live frosted glass behind a whole window (Windows 11 22H2 and newer).
+    // Returns false on older Windows; the caller then keeps its plain background.
+    public static bool Backdrop(Window w, bool dark)
+    {
+        try
+        {
+            IntPtr h = new WindowInteropHelper(w).Handle;
+            int d = dark ? 1 : 0;
+            DwmSetWindowAttribute(h, 20, ref d, 4);                               // title bar follows light / dark
+            int acrylic = 3;                                                      // DWMSBT_TRANSIENTWINDOW
+            if (DwmSetWindowAttribute(h, 38, ref acrylic, 4) != 0) return false;  // DWMWA_SYSTEMBACKDROP_TYPE
+            HwndSource.FromHwnd(h).CompositionTarget.BackgroundColor = Colors.Transparent;
+            MARGINS m = new MARGINS();
+            m.L = m.R = m.T = m.B = -1;
+            DwmExtendFrameIntoClientArea(h, ref m);
+            return true;
+        }
+        catch { return false; }
+    }
 
     const string Xaml = @"
 <ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
@@ -1224,6 +1369,12 @@ class PetWindow : Window
     MenuItem actsItem;
     const double StatusW = 176;
 
+    // Admin area (password protected): feature demo and editing XP / hunger
+    bool adminOn, featDemo, fdMusic;
+    int fdStep, fdXp;
+    double fdT, fdFood;
+    string fdHat;
+
     // Mouse
     bool pressed, dragging;
     Point pressPos;
@@ -1267,7 +1418,7 @@ class PetWindow : Window
         view.MouseLeftButtonUp += OnUp;
         SourceInitialized += OnSourceInit;
         Loaded += OnLoaded;
-        Closed += delegate { Cfg.Save(); if (tray != null) { tray.Visible = false; tray.Dispose(); } };
+        Closed += delegate { EndFeatureDemo(); Cfg.Save(); if (tray != null) { tray.Visible = false; tray.Dispose(); } };
     }
 
     // ---------- Startup ----------
@@ -1297,6 +1448,14 @@ class PetWindow : Window
         last = DateTime.UtcNow;
         timer.Start();
         if (ShotPath != null) MenuShot();
+        if (LogPath != null && Environment.GetEnvironmentVariable("CLAWD_FEATDEMO") == "1")
+        {
+            // developer helper: start the feature demo by itself
+            DispatcherTimer fd = new DispatcherTimer();
+            fd.Interval = TimeSpan.FromSeconds(3);
+            fd.Tick += delegate { fd.Stop(); StartFeatureDemo(); };
+            fd.Start();
+        }
 
         // Hand memory we are not touching back to Windows: once after start-up, then now and then
         DispatcherTimer trim = new DispatcherTimer(DispatcherPriority.Background);
@@ -1532,6 +1691,25 @@ class PetWindow : Window
         md.IsChecked = demo;
         md.Click += delegate { demo = md.IsChecked; demoIdx = 0; if (demo && !dragging) Set("idle"); RebuildUi(); };
         menu.Items.Add(md);
+
+        if (!adminOn) menu.Items.Add(MI("Admin…", AskAdmin));
+        else
+        {
+            MenuItem ad = MI("Admin", null);
+            ad.Items.Add(MI(T("Funktions-Demo starten", "Run feature demo"), StartFeatureDemo));
+            ad.Items.Add(new Separator());
+            ad.Items.Add(MI("XP +5", delegate { SetXp(Cfg.Xp + 5); }));
+            ad.Items.Add(MI("XP +25", delegate { SetXp(Cfg.Xp + 25); }));
+            ad.Items.Add(MI("Level +1", delegate { SetXp(Cfg.XpFor(Cfg.Level + 1)); }));
+            ad.Items.Add(MI(T("XP auf 0", "Reset XP"), delegate { SetXp(0); }));
+            ad.Items.Add(new Separator());
+            ad.Items.Add(MI(T("Hunger: satt", "Hunger: full"), delegate { SetFood(100); }));
+            ad.Items.Add(MI(T("Hunger: hungrig", "Hunger: hungry"), delegate { SetFood(25); }));
+            ad.Items.Add(MI(T("Hunger: sehr hungrig", "Hunger: starving"), delegate { SetFood(5); }));
+            ad.Items.Add(new Separator());
+            ad.Items.Add(MI(T("Admin sperren", "Lock admin"), delegate { adminOn = false; RebuildUi(); }));
+            menu.Items.Add(ad);
+        }
         menu.Items.Add(new Separator());
         menu.Items.Add(MI(T("Beenden", "Quit"), Close));
         view.ContextMenu = menu;
@@ -1702,7 +1880,7 @@ class PetWindow : Window
 
     void AddXp(int n)
     {
-        if (demo) return;
+        if (demo || featDemo) return;
         int before = Cfg.Level;
         Cfg.Xp += n;
         Spawn(P_TEXT, 0, -15 - HatH(), 0, -4, 1.5, "+" + n + " XP", 2.3, yellow);
@@ -1712,18 +1890,183 @@ class PetWindow : Window
 
     void LevelUp()
     {
-        int lv = Cfg.Level;
+        Confetti();
+        Announce(LevelText(Cfg.Level), 5);
+        RebuildUi();
+    }
+
+    void Confetti()
+    {
         for (int i = 0; i < 26; i++)
             Spawn(P_CRUMB, -10 + R() * 20, -12 - R() * 8, (R() - 0.5) * 22, -6 - R() * 12, 1.2 + R() * 0.8, null, 0, Pal());
+    }
+
+    // "Level 3!" plus what that level unlocks.
+    string LevelText(int lv)
+    {
         List<string> news = new List<string>();
         string[] al = Cfg.Lang == "de" ? ActLabelsDe : ActLabelsEn, cl = Cfg.ColLabels(), hl = Cfg.HatLabels();
         for (int i = 0; i < ActNames.Length; i++) if (ActLevel(ActNames[i]) == lv) news.Add(al[i]);
         for (int i = 0; i < cl.Length; i++) if (Cfg.ColLevel[i] == lv) news.Add(cl[i]);
         for (int i = 0; i < hl.Length; i++) if (Cfg.HatLevel[i] == lv) news.Add(hl[i]);
         string text = "Level " + lv + "!";
-        if (news.Count > 0) text += "\n" + T("Neu: ", "New: ") + string.Join(", ", news.ToArray());
-        Announce(text, 5);
+        if (news.Count > 0) text += Environment.NewLine + T("Neu: ", "New: ") + string.Join(", ", news.ToArray());
+        return text;
+    }
+
+    // ---------- Admin area ----------
+
+    void AskAdmin()
+    {
+        dialogOpen = true;
+        PasswordWindow w = new PasswordWindow();
+        w.ShowDialog();
+        dialogOpen = false;
+        if (!w.Ok) return;
+        adminOn = true;
         RebuildUi();
+    }
+
+    void SetXp(int xp)
+    {
+        EndFeatureDemo();
+        int before = Cfg.Level;
+        Cfg.Xp = Math.Max(0, xp);
+        Cfg.Save();
+        if (Cfg.Level > before) LevelUp(); else RebuildUi();
+    }
+
+    void SetFood(double food)
+    {
+        EndFeatureDemo();
+        Cfg.Food = food;
+        hungerNag = 0; // if he is hungry now, he says so right away
+        Cfg.Save();
+    }
+
+    // Shows the newer features one after the other: outfits, hunger, feeding, level-up,
+    // dancing to music, landing on a window. Works on copies - XP, hunger and outfit are restored afterwards.
+    void StartFeatureDemo()
+    {
+        if (featDemo || dragging) return;
+        featDemo = true;
+        fdStep = 0;
+        fdT = 0.8;
+        fdMusic = false;
+        fdXp = Cfg.Xp; fdFood = Cfg.Food; fdHat = Cfg.Hat;
+        Cfg.Hat = "none";
+        hungerShow = 0;
+        bubbleT = 0;
+        Set("wave");
+        dur = 99;
+    }
+
+    void EndFeatureDemo()
+    {
+        if (!featDemo) return;
+        featDemo = false;
+        fdMusic = false;
+        Cfg.Xp = fdXp; Cfg.Food = fdFood; Cfg.Hat = fdHat;
+    }
+
+    void FeatureDemo(double dt)
+    {
+        if (dragging) return;
+        fdT -= dt;
+        if (fdT > 0) return;
+        int step = fdStep++;
+        if (step < 5)
+        {
+            // try on every outfit
+            Cfg.Hat = Cfg.HatVals[step + 1];
+            for (int i = 0; i < 8; i++)
+                Spawn(P_CRUMB, -8 + R() * 16, -13 - R() * 5, (R() - 0.5) * 12, -3 - R() * 6, 0.7, null, 0, Pal());
+            t = 0;
+            fdT = 1.4;
+        }
+        else if (step == 5)
+        {
+            // hungry: the cookie bubble
+            Cfg.Hat = "none";
+            Cfg.Food = 12;
+            Set("idle");
+            dur = 99;
+            hungerShow = 3.2;
+            bubbleAge = 0;
+            fdT = 3.2;
+        }
+        else if (step == 6)
+        {
+            hungerShow = 0;
+            Set("eat");
+            Cfg.Food = 60;
+            Spawn(P_TEXT, 0, -15, 0, -4, 1.5, "+5 XP", 2.3, yellow);
+            fdT = 3.8;
+        }
+        else if (step == 7)
+        {
+            Confetti();
+            Announce(LevelText(Cfg.Level + 1), 4);
+            Set("jump");
+            fdT = 4.4;
+        }
+        else if (step == 8)
+        {
+            // music: headphones on, bounce to a made-up beat
+            bubbleT = 0;
+            Cfg.Hat = "phones";
+            Set("dance");
+            musicDance = true;
+            fdMusic = true;
+            dur = 99;
+            fdT = 6;
+        }
+        else if (step == 9)
+        {
+            // drop onto the frontmost window that has room
+            fdMusic = false;
+            Cfg.Hat = "none";
+            bool found = false;
+            for (int i = 0; i < plats.Count && !found; i++)
+            {
+                Plat p = plats[i];
+                double cx = Math.Max(work.Left + 12 * S, Math.Min(work.Right - 12 * S, (p.L + p.R) / 2));
+                if (!p.Stand || cx < p.L + 8 * S || cx > p.R - 8 * S || Covered(i, cx, p.T)) continue;
+                found = true;
+                perch = IntPtr.Zero;
+                x = cx;
+                y = Math.Max(work.Top + 13 * S, p.T - 45 * S);
+                vx = vy = 0;
+                Set("fall");
+                air = true;
+            }
+            if (found) fdT = 3.5;
+            else
+            {
+                Set("idle");
+                dur = 99;
+                Announce(T("Für den Fenster-Teil bitte ein Fenster öffnen.", "Open a window for the window part."), 3.5);
+                fdStep = 11;
+                fdT = 3.5;
+            }
+        }
+        else if (step == 10)
+        {
+            // run off the nearer edge and fall down
+            foreach (Plat p in plats)
+            {
+                if (p.H != perch) continue;
+                Set("run");
+                tx = Math.Max(work.Left + 12 * S, Math.Min(work.Right - 12 * S, x - p.L < p.R - x ? p.L - 10 * S : p.R + 10 * S));
+                break;
+            }
+            fdT = 6;
+        }
+        else
+        {
+            EndFeatureDemo();
+            if (!air) Set("idle");
+        }
     }
 
     // Like Say, but also shown when speech bubbles are switched off (level-ups).
@@ -1896,7 +2239,7 @@ class PetWindow : Window
         if (logT <= 0 && LogPath != null)
         {
             logT = 1;
-            Log(st + " x=" + (int)x + " y=" + (int)y + " air=" + air + " windows=" + plats.Count + " sound=" + level.ToString("0.000") + " playing=" + playT.ToString("0.0") + " level=" + Cfg.Level + " food=" + (int)Cfg.Food);
+            Log((featDemo ? "demo" + fdStep + " " : "") + "hat=" + Cfg.Hat + " " + st + " x=" + (int)x + " y=" + (int)y + " air=" + air + " windows=" + plats.Count + " sound=" + level.ToString("0.000") + " playing=" + playT.ToString("0.0") + " level=" + Cfg.Level + " food=" + (int)Cfg.Food);
         }
         ReadInput(dt);
         UpdateNeeds(dt);
@@ -1907,6 +2250,7 @@ class PetWindow : Window
             scanT = air || dragging ? 0.08 : 0.25;
             ScanWindows();
         }
+        if (featDemo && (menu == null || !menu.IsOpen)) FeatureDemo(dt);
         if (menu == null || !menu.IsOpen) UpdatePet(dt);
         UpdateParticles(dt);
         Place();
@@ -1931,7 +2275,7 @@ class PetWindow : Window
     {
         petXpT -= dt;
         hungerShow -= dt;
-        if (demo) return;
+        if (demo || featDemo) return;
         Cfg.Food = Math.Max(0, Cfg.Food - dt * 100 / 9000); // full -> empty in about 2.5 hours
         saveT -= dt;
         if (saveT <= 0) { saveT = 60; Cfg.Save(); }
@@ -1947,6 +2291,7 @@ class PetWindow : Window
     // When sound has been playing for a few seconds he starts dancing - in bouts, not non-stop.
     void UpdateMusic(double dt)
     {
+        if (featDemo) { beat = fdMusic ? 0.12 + 0.2 * Math.Abs(Math.Sin(anim * 3.5)) : 0; return; }
         if (!Cfg.Music || demo) { beat = 0; playT = 0; return; }
         soundT -= dt;
         if (soundT <= 0) { soundT = 0.1; level = Sound.Peak(); }
@@ -2054,7 +2399,7 @@ class PetWindow : Window
     // Only counts THAT keys are being pressed - never which ones. Nothing is stored or sent.
     void ReadInput(double dt)
     {
-        if (demo) return; // the script decides, not the keyboard
+        if (demo || featDemo) return; // the script decides, not the keyboard
         int hits = 0;
         for (int vk = 8; vk < 255; vk++)
         {
@@ -2198,7 +2543,9 @@ class PetWindow : Window
             case "idle":
                 if (t > dur && !air)
                 {
-                    if (demo) NextDemo(); else PickActivity();
+                    if (featDemo) { }
+                    else if (demo) NextDemo();
+                    else PickActivity();
                 }
                 break;
             case "walk":

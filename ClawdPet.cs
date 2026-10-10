@@ -57,7 +57,7 @@ static class Program
             PetWindow.DemoAtStart = Array.IndexOf(args, "--demo") >= 0;
             Application app = new Application();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            if (Cfg.FirstRun || Array.IndexOf(args, "--setup") >= 0) new SetupWindow().ShowDialog();
+            if (Cfg.FirstRun || Cfg.AlwaysSetup || Array.IndexOf(args, "--setup") >= 0) new SetupWindow().ShowDialog();
             PetWindow pet = new PetWindow();
             app.MainWindow = pet;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -78,6 +78,7 @@ static class Cfg
     public static string Color = Orange;
     public static bool FirstRun = true;
     public static bool ReadOnly;
+    public static bool AlwaysSetup; // settings line "setup=always": show the welcome window on every start (handy for recordings)
 
     public static readonly int[] SizeVals = { 3, 5, 7, 10 };
     public static readonly string[] ColVals = { Orange, "#F06FA8", "#4A90D9", "#3FA66B", "#9B6FE8", "#3DD6D0" };
@@ -110,6 +111,7 @@ static class Cfg
                 if (kv[0] == "lang") { Lang = kv[1] == "de" ? "de" : "en"; FirstRun = false; }
                 if (kv[0] == "size") Size = Math.Max(2, Math.Min(12, int.Parse(kv[1])));
                 if (kv[0] == "talk") Talk = kv[1] == "1";
+                if (kv[0] == "setup") AlwaysSetup = kv[1] == "always";
                 if (kv[0] == "color" && kv[1].StartsWith("#")) Color = kv[1];
             }
         }
@@ -122,7 +124,7 @@ static class Cfg
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
-            File.WriteAllLines(FilePath, new string[] { "lang=" + Lang, "size=" + Size, "talk=" + (Talk ? "1" : "0"), "color=" + Color });
+            File.WriteAllLines(FilePath, new string[] { "lang=" + Lang, "size=" + Size, "talk=" + (Talk ? "1" : "0"), "color=" + Color, "setup=" + (AlwaysSetup ? "always" : "first") });
         }
         catch { }
     }

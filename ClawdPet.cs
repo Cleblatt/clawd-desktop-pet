@@ -42,6 +42,7 @@ static class Program
         {
             if (!created) return;
             Cfg.Load();
+            PetWindow.DemoAtStart = Array.IndexOf(args, "--demo") >= 0;
             Application app = new Application();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             if (Cfg.FirstRun) new SetupWindow().ShowDialog();
@@ -439,6 +440,12 @@ class PetWindow : Window
     double typingT = 99, tapT;
     int tapArm;
     bool typed, wasAway;
+
+    // Demo mode: plays every activity in a fixed order (for screen recordings)
+    public static bool DemoAtStart;
+    static readonly string[] DemoScript = { "wave", "walk", "code", "coffee", "read", "dance", "jump", "flip", "cool", "juggle", "pet", "eat", "stretch", "sleep", "chase", "climb", "balloon" };
+    bool demo = DemoAtStart;
+    int demoIdx;
     Brush bodyB = body;
 
     // Mouse
@@ -589,6 +596,12 @@ class PetWindow : Window
         menu.Items.Add(ma);
 
         menu.Items.Add(MI(T("Einstellungen…", "Settings…"), OpenSetup));
+
+        MenuItem md = MI(T("Demo-Modus", "Demo mode"), null);
+        md.IsCheckable = true;
+        md.IsChecked = demo;
+        md.Click += delegate { demo = md.IsChecked; demoIdx = 0; if (demo && !dragging) Set("idle"); };
+        menu.Items.Add(md);
         menu.Items.Add(new Separator());
         menu.Items.Add(MI(T("Beenden", "Quit"), Close));
         view.ContextMenu = menu;
@@ -793,6 +806,8 @@ class PetWindow : Window
             case "fall": maxImpact = 0; break;
             case "dizzy": dur = 2.5; break;
         }
+        // keep the show moving: short pauses, nothing longer than 5 seconds
+        if (demo) dur = s == "idle" ? 1.2 : Math.Min(dur, 5);
     }
 
     void PickActivity()
@@ -809,6 +824,12 @@ class PetWindow : Window
             r -= Weight(i, night);
             if (r < 0) { lastAct = ActNames[i]; Set(ActNames[i]); return; }
         }
+    }
+
+    void NextDemo()
+    {
+        string a = DemoScript[demoIdx++ % DemoScript.Length];
+        if (a == "pet") PetIt(); else Set(a);
     }
 
     static int Weight(int i, bool night)
@@ -839,6 +860,7 @@ class PetWindow : Window
     // Only counts THAT keys are being pressed - never which ones. Nothing is stored or sent.
     void ReadInput(double dt)
     {
+        if (demo) return; // the script decides, not the keyboard
         int hits = 0;
         for (int vk = 8; vk < 255; vk++)
         {
@@ -962,7 +984,10 @@ class PetWindow : Window
         switch (st)
         {
             case "idle":
-                if (t > dur && !air) PickActivity();
+                if (t > dur && !air)
+                {
+                    if (demo) NextDemo(); else PickActivity();
+                }
                 break;
             case "walk":
                 if (MoveTo(tx, 12 * S, dt)) Set("idle");
@@ -1054,7 +1079,7 @@ class PetWindow : Window
                 }
                 break;
             case "stretch":
-                if (t > dur) Set(R() < 0.5 ? "sleep" : "idle");
+                if (t > dur) Set(R() < 0.5 && !demo ? "sleep" : "idle");
                 break;
             case "eat":
                 if (Every(0.9, dt) && t > 0.5)

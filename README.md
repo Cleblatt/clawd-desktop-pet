@@ -66,6 +66,10 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 The whole app is one file, [`ClawdPet.cs`](ClawdPet.cs).
 
+## Demo mode
+
+Want to record a video? Right-click Clawd → **Demo mode** (or start with `ClawdPet.exe --demo`). He then plays all 17 activities one after another in a fixed loop, a few seconds each, and ignores your keyboard while doing so.
+
 ## Privacy
 
 To type along, the app asks Windows *whether* a key is currently pressed (`GetAsyncKeyState`). It never looks at *which* key, and nothing is stored or sent anywhere – the app does not use the network at all. Some antivirus tools flag this kind of check anyway.

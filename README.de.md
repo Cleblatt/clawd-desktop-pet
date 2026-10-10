@@ -66,6 +66,10 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 Die ganze App steckt in einer Datei: [`ClawdPet.cs`](ClawdPet.cs).
 
+## Demo-Modus
+
+Du willst ein Video aufnehmen? Rechtsklick auf Clawd → **Demo-Modus** (oder Start mit `ClawdPet.exe --demo`). Dann spielt er alle 17 Aktivitäten nacheinander in fester Reihenfolge ab, jeweils ein paar Sekunden, und ignoriert dabei deine Tastatur.
+
 ## Datenschutz
 
 Zum Mittippen fragt die App Windows, *ob* gerade eine Taste gedrückt ist (`GetAsyncKeyState`). *Welche* Taste es ist, wird nie ausgewertet, und nichts wird gespeichert oder gesendet – die App nutzt das Netzwerk überhaupt nicht. Manche Virenscanner stufen so eine Abfrage trotzdem als verdächtig ein.

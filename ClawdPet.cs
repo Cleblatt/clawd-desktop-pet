@@ -166,7 +166,11 @@ class SetupWindow : Window
         Width = 400;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        // Always centre on the primary monitor (CenterScreen would follow the mouse)
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - 400) / 2;
+        Top = SystemParameters.WorkArea.Top + 80;
+        Loaded += delegate { Top = SystemParameters.WorkArea.Top + Math.Max(0, (SystemParameters.WorkArea.Height - ActualHeight) / 2); };
         Topmost = true;
         Background = Paper;
         Foreground = Ink;

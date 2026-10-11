@@ -2022,12 +2022,17 @@ final class SetupWindow: NSObject, NSWindowDelegate {
         ok.target = self
         ok.action = #selector(done)
 
-        let stack = NSStackView(views: [logo, head, sub, lLang, langSeg, lSize, sizeSeg, lColor, row, talk, auto, ok, hint])
+        // the stack lines everything up on the left; the logo gets a full-width box to sit centred in
+        let logoBox = NSView()
+        logo.translatesAutoresizingMaskIntoConstraints = false
+        logoBox.addSubview(logo)
+
+        let stack = NSStackView(views: [logoBox, head, sub, lLang, langSeg, lSize, sizeSeg, lColor, row, talk, auto, ok, hint])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 44, left: 30, bottom: 26, right: 30)
-        stack.setCustomSpacing(14, after: logo)
+        stack.setCustomSpacing(14, after: logoBox)
         stack.setCustomSpacing(4, after: head)
         stack.setCustomSpacing(20, after: sub)
         stack.setCustomSpacing(16, after: langSeg)
@@ -2045,8 +2050,11 @@ final class SetupWindow: NSObject, NSWindowDelegate {
             stack.topAnchor.constraint(equalTo: glass.topAnchor),
             stack.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
             glass.widthAnchor.constraint(equalToConstant: 380),
-            logo.centerXAnchor.constraint(equalTo: glass.centerXAnchor),
-            head.centerXAnchor.constraint(equalTo: glass.centerXAnchor),
+            logoBox.widthAnchor.constraint(equalToConstant: 320),
+            logoBox.heightAnchor.constraint(equalToConstant: 60),
+            logo.centerXAnchor.constraint(equalTo: logoBox.centerXAnchor),
+            logo.topAnchor.constraint(equalTo: logoBox.topAnchor),
+            head.widthAnchor.constraint(equalToConstant: 320),
             sub.widthAnchor.constraint(equalToConstant: 320),
             langSeg.widthAnchor.constraint(equalToConstant: 320),
             sizeSeg.widthAnchor.constraint(equalToConstant: 320),

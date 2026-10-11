@@ -63,6 +63,25 @@ Alles lässt sich später per Rechtsklick auf Clawd ändern.
 
 > Windows SmartScreen warnt eventuell vor einem unbekannten Herausgeber, weil die Datei nicht signiert ist. Wähle „Weitere Informationen“ → „Trotzdem ausführen“ oder baue die App selbst aus dem Quellcode.
 
+## macOS
+
+Es gibt auch eine Mac-Version, geschrieben in Swift (Ordner [`mac`](mac)). Sie braucht macOS 12 oder neuer und läuft auf Apple-Chips und Intel.
+
+**Download:** [ClawdPet-mac.zip](../../raw/mac-ci/ClawdPet-mac.zip) – immer der neueste automatische Bau. Entpacken und `ClawdPet.app` an einen beliebigen Ort legen.
+
+Die App ist nicht mit einem bezahlten Apple-Entwicklerkonto signiert, deshalb blockiert macOS den ersten Start. Rechtsklick auf die App → **Öffnen** → **Öffnen**. Auf neueren macOS-Versionen: einmal versuchen zu öffnen, dann Systemeinstellungen → Datenschutz & Sicherheit → **Dennoch öffnen**.
+
+Was auf dem Mac anders ist:
+
+- Clawd steht auf dem Dock und hat ein Symbol in der Menüleiste statt neben der Uhr
+- Menüs und Willkommensfenster nutzen das normale macOS-Aussehen
+- Kein Tanzen zu Musik (macOS gibt den Lautsprecherpegel nicht heraus)
+- Alles andere ist gleich: Fenster als Plattformen, Mittippen, Hunger, Level, Outfits, Demo-Modus
+
+Selbst bauen auf einem Mac mit den Xcode-Kommandozeilenwerkzeugen: `bash mac/build.sh`
+
+> Die Mac-Version wird automatisch auf Macs von GitHub gebaut und gestartet, das Ergebnis wird anhand von Bildschirmfotos geprüft. Klicken, Ziehen und Werfen hat auf einem echten Mac noch kein Mensch ausprobiert – Rückmeldungen sind willkommen.
+
 ## Selbst bauen
 
 Es muss nichts installiert werden – das Skript nutzt den C#-Compiler, der in Windows enthalten ist (.NET Framework 4.x):

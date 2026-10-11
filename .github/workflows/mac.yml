@@ -1,0 +1,83 @@
+name: macOS build
+
+# Builds the Mac app on one of GitHub's Macs, starts it there and takes pictures.
+# The results (build log, pictures, zipped app) are pushed to the branch "mac-ci".
+on:
+  push:
+    paths:
+      - 'mac/**'
+      - '.github/workflows/mac.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          mkdir -p out
+          echo "$GITHUB_SHA" > out/commit.txt
+          set -o pipefail
+          bash mac/build.sh 2>&1 | tee out/build.log
+
+      - name: Self-test pictures
+        if: always()
+        run: |
+          B=mac/build/ClawdPet.app/Contents/MacOS/ClawdPet
+          if [ -x "$B" ]; then
+            "$B" --sheet "$PWD/out/poses.png" 2>&1 | tee -a out/test.log || true
+            cp mac/build/icon.png out/ || true
+          fi
+
+      - name: Run on the desktop
+        if: always()
+        run: |
+          APP=mac/build/ClawdPet.app
+          [ -d "$APP" ] || exit 0
+          sw_vers > out/system.txt
+          # first start: the welcome window
+          open "$APP"
+          sleep 7
+          screencapture -x out/shot-1-setup.png || true
+          pkill -x ClawdPet || true
+          sleep 1
+          # a window to land on, then the feature demo with a status log
+          open "$HOME" || true
+          sleep 3
+          "$APP/Contents/MacOS/ClawdPet" --log "$PWD/out/pet.log" --featdemo > out/run.log 2>&1 &
+          sleep 9
+          screencapture -x out/shot-2-outfit.png || true
+          sleep 5
+          screencapture -x out/shot-3-hungry.png || true
+          sleep 7
+          screencapture -x out/shot-4-levelup.png || true
+          sleep 5
+          screencapture -x out/shot-5-dance.png || true
+          sleep 7
+          screencapture -x out/shot-6-window.png || true
+          sleep 9
+          pkill -x ClawdPet || true
+
+      - name: Publish results
+        if: always()
+        run: |
+          cp mac/build/ClawdPet-mac.zip out/ 2>/dev/null || true
+          cd out
+          git init -q -b mac-ci
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "macOS build output for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" mac-ci
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ClawdPet-mac
+          path: out

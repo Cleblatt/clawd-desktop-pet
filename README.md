@@ -44,7 +44,7 @@
 | Click | Pet him (hearts!) – or wake him up |
 | Double-click | Flip |
 | Drag and release | Pick him up and throw him – he bounces, and gets dizzy after a hard landing |
-| Right-click | Menu: level and hunger, feed, activities, outfit, color, size, language, speech bubbles, dance to music, start with Windows |
+| Right-click | Menu: level and hunger, feed, activities, outfit, color, size, language, speech bubbles, dance to music, start with Windows, send feedback |
 | Tray icon | Show / hide, bring him back to the centre, quit |
 
 More tricks are waiting in the right-click menu – some of them only once he has reached the right level.
@@ -106,6 +106,10 @@ For dancing, the app reads how loud your speakers currently are – just the lev
 The right-click menu has a frosted-glass look. For that, the app takes a snapshot of the small screen area behind the menu at the moment it opens and blurs it. The snapshot only lives in memory while the menu is open.
 
 Settings and progress live in `%AppData%\ClawdPet\settings.txt`.
+
+## Feedback
+
+Found a bug or have a wish? Right-click Clawd → **Send feedback…**. That opens a short form in your browser – no account needed. The app itself still sends nothing; only what you type into the form is submitted, together with the app version and your system version.
 
 ## Good to know
 

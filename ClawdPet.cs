@@ -1524,6 +1524,17 @@ class PetWindow : Window
         dt.Start();
     }
 
+    // Opens the feedback form in the browser. The app itself sends nothing.
+    void SendFeedback()
+    {
+        try
+        {
+            string os = Uri.EscapeDataString("Windows " + Environment.OSVersion.Version);
+            System.Diagnostics.Process.Start("https://tally.so/r/2EqDqb?version=1.3&os=" + os);
+        }
+        catch { }
+    }
+
     MenuItem MI(string header, Action a)
     {
         MenuItem m = new MenuItem();
@@ -1691,6 +1702,7 @@ class PetWindow : Window
         md.IsChecked = demo;
         md.Click += delegate { demo = md.IsChecked; demoIdx = 0; if (demo && !dragging) Set("idle"); RebuildUi(); };
         menu.Items.Add(md);
+        menu.Items.Add(MI(T("Feedback senden…", "Send feedback…"), SendFeedback));
 
         if (!adminOn) menu.Items.Add(MI("Admin…", AskAdmin));
         else

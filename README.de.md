@@ -44,7 +44,7 @@
 | Klick | Streicheln (Herzchen!) – oder aufwecken |
 | Doppelklick | Salto |
 | Ziehen und loslassen | Hochheben und werfen – er prallt ab und wird nach hartem Aufprall schwindelig |
-| Rechtsklick | Menü: Level und Hunger, Füttern, Aktivitäten, Outfit, Farbe, Größe, Sprache, Sprechblasen, zu Musik tanzen, Autostart |
+| Rechtsklick | Menü: Level und Hunger, Füttern, Aktivitäten, Outfit, Farbe, Größe, Sprache, Sprechblasen, zu Musik tanzen, Autostart, Feedback senden |
 | Symbol neben der Uhr | Zeigen / Verstecken, zurück in die Mitte, Beenden |
 
 Im Rechtsklick-Menü warten noch mehr Tricks – manche erst, wenn er das passende Level erreicht hat.
@@ -106,6 +106,10 @@ Fürs Tanzen liest die App, wie laut deine Lautsprecher gerade sind – nur den 
 Das Rechtsklick-Menü hat einen Milchglas-Look. Dafür nimmt die App beim Öffnen ein Bild des kleinen Bildschirmbereichs hinter dem Menü auf und zeichnet es weich. Das Bild liegt nur im Arbeitsspeicher, solange das Menü offen ist.
 
 Einstellungen und Fortschritt liegen in `%AppData%\ClawdPet\settings.txt`.
+
+## Feedback
+
+Fehler gefunden oder einen Wunsch? Rechtsklick auf Clawd → **Feedback senden…**. Das öffnet ein kurzes Formular im Browser – ohne Konto. Die App selbst sendet weiterhin nichts; übertragen wird nur, was du ins Formular schreibst, dazu die App-Version und deine Systemversion.
 
 ## Gut zu wissen
 

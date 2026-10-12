@@ -1538,7 +1538,7 @@ class PetWindow : Window
         try
         {
             string os = Uri.EscapeDataString("Windows " + Environment.OSVersion.Version);
-            System.Diagnostics.Process.Start("https://tally.so/r/2EqDqb?version=1.3&os=" + os);
+            System.Diagnostics.Process.Start("https://tally.so/r/2EqDqb?version=1.4&os=" + os);
         }
         catch { }
         // a little thank-you: the flower outfit

@@ -2158,7 +2158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // opens the feedback form in the browser; the app itself sends nothing
             let v = ProcessInfo.processInfo.operatingSystemVersion
             let os = "macOS%20\(v.majorVersion).\(v.minorVersion)"
-            if let url = URL(string: "https://tally.so/r/2EqDqb?version=1.3&os=" + os) { NSWorkspace.shared.open(url) }
+            if let url = URL(string: "https://tally.so/r/2EqDqb?version=1.4&os=" + os) { NSWorkspace.shared.open(url) }
             // a little thank-you: the flower outfit
             if !Cfg.thanked {
                 Cfg.thanked = true

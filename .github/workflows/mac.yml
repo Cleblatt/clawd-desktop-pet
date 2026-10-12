@@ -15,7 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -78,6 +78,47 @@ jobs:
           ls -la out >> out/video.log
           if [ -s out/selftest-raw.mov ]; then
             avconvert --source out/selftest-raw.mov --preset Preset1280x720 --output out/selftest.mp4 >> out/video.log 2>&1 && rm out/selftest-raw.mov || true
+          fi
+
+      - name: Promo recording
+        if: always()
+        run: |
+          APP=mac/build/ClawdPet.app
+          B="$APP/Contents/MacOS/ClawdPet"
+          [ -x "$B" ] || exit 0
+          # a nicer desktop: a system wallpaper and a tidy Finder window
+          ls -la "/System/Library/Desktop Pictures" > out/wallpapers.txt 2>&1 || true
+          WP=""
+          for n in "Sonoma.heic" "Sonoma Horizon.heic" "Ventura Graphic.heic" "Monterey Graphic.heic" "Big Sur Graphic.heic"; do
+            if [ -z "$WP" ] && [ -f "/System/Library/Desktop Pictures/$n" ]; then WP="/System/Library/Desktop Pictures/$n"; fi
+          done
+          if [ -z "$WP" ]; then WP=$(ls "/System/Library/Desktop Pictures/"*.heic 2>/dev/null | head -1); fi
+          echo "wallpaper: $WP" > out/promo-video.log
+          if [ -n "$WP" ]; then "$B" --wallpaper "$WP" >> out/promo-video.log 2>&1 || true; fi
+          osascript -e 'tell application "Finder" to close every window' >> out/promo-video.log 2>&1 || true
+          open /System/Applications || true
+          sleep 4
+          # does the recorder accept the option that shows the mouse pointer?
+          CUR="-C"
+          screencapture -v -V 2 -C -x out/ctest.mov >> out/promo-video.log 2>&1 || true
+          if [ ! -s out/ctest.mov ]; then CUR=""; fi
+          rm -f out/ctest.mov
+          echo "cursor option: '$CUR'" >> out/promo-video.log
+          screencapture -v -V 80 $CUR -x out/promo-raw.mov >> out/promo-video.log 2>&1 &
+          REC=$!
+          sleep 2
+          "$B" --promo --log "$PWD/out/promo.log" > out/run3.log 2>&1 &
+          for i in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19; do
+            sleep 4
+            screencapture $CUR -x -t jpg "out/pr-$i.jpg" || true
+          done
+          wait $REC || true
+          pkill -x ClawdPet || true
+          ls -la out >> out/promo-video.log
+          if [ -s out/promo-raw.mov ]; then
+            avconvert --source out/promo-raw.mov --preset Preset1920x1080 --output out/promo.mp4 >> out/promo-video.log 2>&1 || true
+            # keep the original only if it is small enough for the repository
+            if [ -s out/promo.mp4 ] && [ $(stat -f%z out/promo-raw.mov) -gt 60000000 ]; then rm out/promo-raw.mov; fi
           fi
 
       - name: Publish results

@@ -6,6 +6,49 @@ import Cocoa
 import CryptoKit
 import ServiceManagement
 
+// Promo recording (--promo): the app plays the scenes of a video by itself, mouse pointer included.
+let promoMode = CommandLine.arguments.contains("--promo")
+
+// Moves the real mouse pointer smoothly and clicks, so a screen recording shows a hand at work.
+enum Hand {
+    static var pos = CGEvent(source: nil)?.location ?? CGPoint(x: 1200, y: 600)
+
+    static func after(_ secs: Double, _ run: @escaping () -> Void) {
+        // a timer in the common modes also fires while a dialog or a menu is open
+        let t = Timer(timeInterval: secs, repeats: false) { _ in run() }
+        RunLoop.main.add(t, forMode: .common)
+    }
+
+    static func glide(to p: CGPoint, _ secs: Double, then: (() -> Void)? = nil) {
+        let from = pos, start = Date()
+        let t = Timer(timeInterval: 1.0 / 60.0, repeats: true) { tm in
+            let raw = min(1, Date().timeIntervalSince(start) / secs)
+            let u = raw * raw * (3 - 2 * raw)
+            pos = CGPoint(x: from.x + (p.x - from.x) * u, y: from.y + (p.y - from.y) * u)
+            CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: pos, mouseButton: .left)?.post(tap: .cghidEventTap)
+            if raw >= 1 {
+                tm.invalidate()
+                then?()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+    }
+
+    static func click() {
+        for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+            CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: pos, mouseButton: .left)?.post(tap: .cghidEventTap)
+        }
+    }
+
+    // Centre of a view in the coordinates the mouse uses (origin at the top left of the main screen).
+    static func centre(_ v: NSView) -> CGPoint {
+        guard let w = v.window else { return pos }
+        let r = w.convertToScreen(v.convert(v.bounds, to: nil))
+        let h = NSScreen.screens.first?.frame.height ?? 0
+        return CGPoint(x: r.midX, y: h - r.midY)
+    }
+}
+
 // MARK: - Settings
 
 func T(_ de: String, _ en: String) -> String { return Cfg.lang == "de" ? de : en }
@@ -232,6 +275,12 @@ final class Pet: NSView {
     var fakeCur: (x: Double, y: Double)?
     var dragFrom = (x: 0.0, y: 0.0)
     var onAutoMenu: (() -> Void)?
+
+    // Promo recording: the scenes of the video in a fixed order
+    var promo = false
+    var prStep = 0
+    var prT = 1.0
+    var onPromoMenu: (() -> Void)?
 
     override var isFlipped: Bool { return true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { return true }
@@ -628,6 +677,110 @@ final class Pet: NSView {
         }
     }
 
+    // MARK: Promo recording
+
+    func crumbs() {
+        for _ in 0..<8 {
+            spawn(pCrumb, -8 + R() * 16, -13 - R() * 5, (R() - 0.5) * 12, -3 - R() * 6, 0.7, "", 0, pal())
+        }
+    }
+
+    func promoTick(_ dt: Double) {
+        if typeSim > 0 { typeSim -= dt }
+        if air || st == "walk" || st == "run" { return }
+        prT -= dt
+        if prT > 0 { return }
+        let step = prStep
+        prStep += 1
+        let mid = workL + (workR - workL) / 2
+        log("promo: scene \(step)")
+        switch step {
+        case 0:
+            set("wave")
+            prT = 3.2
+        case 1:
+            // a stroll along the Dock
+            set("walk")
+            tx = workL + (workR - workL) * 0.22
+            prT = 0.7
+        case 2:
+            set("walk")
+            tx = workL + (workR - workL) * 0.6
+            prT = 0.9
+        case 3:
+            // drop onto the frontmost window that has room
+            for i in 0..<plats.count {
+                let p = plats[i]
+                let cx = max(workL + 12 * S, min(workR - 12 * S, (p.l + p.r) / 2))
+                if !p.stand || cx < p.l + 8 * S || cx > p.r - 8 * S || covered(i, cx, p.t) { continue }
+                perch = 0
+                x = cx
+                y = max(workT + 13 * S, p.t - 45 * S)
+                vx = 0
+                vy = 0
+                set("fall")
+                air = true
+                break
+            }
+            prT = 1.6
+        case 4:
+            set("walk")
+            prT = 0.6
+        case 5:
+            // run off the nearer edge and fall down
+            for p in plats where p.id == perch {
+                set("run")
+                tx = max(workL + 12 * S, min(workR - 12 * S, x - p.l < p.r - x ? p.l - 10 * S : p.r + 10 * S))
+                break
+            }
+            prT = 2.8
+        case 6:
+            set("walk")
+            tx = mid
+            prT = 0.8
+        case 7:
+            set("idle")
+            dur = 99
+            typeSim = 5
+            prT = 7.2
+        case 8:
+            set("idle")
+            dur = 99
+            onPromoMenu?()
+            prT = 3.2
+        case 9, 10, 11, 12, 13:
+            Cfg.hat = Cfg.hatVals[step - 8]
+            crumbs()
+            set("idle")
+            dur = 99
+            prT = 1.15
+        case 14:
+            Cfg.hat = "none"
+            feed()
+            prT = 4.2
+        case 15:
+            Cfg.xp = Cfg.xpFor(Cfg.level + 1)
+            levelUp()
+            set("jump")
+            prT = 4.4
+        case 16:
+            bubbleT = 0
+            Cfg.hat = "crown"
+            crumbs()
+            set("dance")
+            dur = 99
+            prT = 5
+        case 17:
+            set("wave")
+            prT = 4
+        default:
+            log("promo: done")
+            set("idle")
+            dur = 99
+            promo = false
+        }
+    }
+
     // MARK: Logic
 
     func R() -> Double { return Double.random(in: 0..<1) }
@@ -810,6 +963,7 @@ final class Pet: NSView {
         }
         if featDemo && !menuOpen { featureDemo(dt) }
         if selfTest && !menuOpen { selfTestTick(dt) }
+        if promo && !menuOpen { promoTick(dt) }
         if !menuOpen { updatePet(dt) }
         updateParticles(dt)
         place()
@@ -873,7 +1027,7 @@ final class Pet: NSView {
             }
         }
         // Nobody there -> fall asleep; back again -> wake up and wave
-        let away = idle > 120 && !selfTest
+        let away = idle > 120 && !selfTest && !promo
         if away && isCalm && st != "sleep" { set("sleep") }
         if wasAway && !away && st == "sleep" { set("wave") }
         wasAway = away
@@ -1812,7 +1966,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Cfg.talk = true
             Cfg.lang = "en"
         }
-        if (Cfg.firstRun || args.contains("--setup")) && !args.contains("--skip-setup") && !logging {
+        if promoMode {
+            // a fresh, hungry Clawd one step below the crown
+            Cfg.readOnly = true
+            Cfg.size = 10
+            Cfg.xp = Cfg.xpFor(5)
+            Cfg.food = 40
+            Cfg.hat = "none"
+            Cfg.color = Cfg.orange
+            Cfg.talk = true
+            Cfg.lang = "en"
+        }
+        if (Cfg.firstRun || args.contains("--setup") || promoMode) && !args.contains("--skip-setup") && (!logging || promoMode) {
             SetupWindow().runModal()
         }
 
@@ -1831,6 +1996,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let i = args.firstIndex(of: "--log"), i + 1 < args.count { pet.logPath = args[i + 1] }
         pet.onMenu = { [weak self] e in self?.showMenu(e) }
         pet.selfTest = args.contains("--selftest")
+        pet.promo = promoMode
+        pet.onPromoMenu = { [weak self] in
+            DispatchQueue.main.async { self?.promoMenu() }
+        }
         pet.onAutoMenu = { [weak self] in
             // not from inside the frame timer, or the animation would stand still while the menu is open
             DispatchQueue.main.async { self?.autoMenu() }
@@ -1869,6 +2038,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         RunLoop.main.add(t, forMode: .common)
         m.popUp(positioning: nil, at: NSPoint(x: pet.W / 2 + 9 * pet.S, y: pet.H - 14 * pet.S), in: pet)
         pet.log("selftest: the menu was open and closed again")
+    }
+
+    // Promo recording: the pointer comes over, the menu opens, the pointer wanders to "Feed" and "Outfit".
+    func promoMenu() {
+        let at = NSPoint(x: pet.W / 2 + 4 * pet.S, y: pet.H - 8 * pet.S)
+        let s = panel.convertPoint(toScreen: pet.convert(at, to: nil))
+        let h = NSScreen.screens.first?.frame.height ?? 0
+        let p = CGPoint(x: s.x, y: h - s.y)
+        Hand.glide(to: p, 0.8) { [weak self] in
+            Hand.after(0.3) {
+                guard let me = self else { return }
+                let m = me.buildMenu()
+                m.delegate = me
+                // the rows are found from the status block at the top, wherever the system puts the menu
+                func row(_ below: CGFloat) -> CGPoint {
+                    guard let v = m.items.first?.view, v.window != nil else { return Hand.pos }
+                    let c = Hand.centre(v)
+                    return CGPoint(x: c.x - 30, y: c.y + v.bounds.height / 2 + below)
+                }
+                Hand.after(1.0) { Hand.glide(to: row(44), 0.5) }
+                Hand.after(2.3) { Hand.glide(to: row(121), 0.45) }
+                Hand.after(5.0) { m.cancelTracking() }
+                m.popUp(positioning: nil, at: at, in: me.pet)
+                me.pet.log("promo: the menu was open and closed again")
+                Hand.after(0.2) { Hand.glide(to: CGPoint(x: 1905, y: 1070), 0.8) }
+            }
+        }
     }
 
     func menuWillOpen(_ menu: NSMenu) { pet.menuOpen = true }
@@ -1946,7 +2142,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if p.demo && !p.dragging { p.set("idle") }
         })
 
-        if !p.adminOn {
+        if promoMode {
+            // nothing for the video
+        } else if !p.adminOn {
             m.addItem(Item("Admin…") { [weak self] in self?.askAdmin() })
         } else {
             let ad = Item("Admin")
@@ -2251,13 +2449,57 @@ final class SetupWindow: NSObject, NSWindowDelegate {
             ctx.duration = 0.25
             win.animator().alphaValue = 1
         }
+        if promoMode { promoPlay() }
         NSApp.runModal(for: win)
+    }
+
+    // Promo recording: the pointer tries two colours, goes back to orange and presses the button.
+    // If a click does not get through, the choice is made directly, so the recording never hangs.
+    func promoPlay() {
+        var at = 1.8
+        for i in [4, 5, 0] {
+            Hand.after(at) { [weak self] in
+                guard let me = self else { return }
+                Hand.glide(to: Hand.centre(me.swatches[i]), 0.55) {
+                    Hand.click()
+                    Hand.after(0.25) {
+                        if me.color != Cfg.colVals[i] {
+                            me.color = Cfg.colVals[i]
+                            me.mark()
+                        }
+                    }
+                }
+            }
+            at += 1.35
+        }
+        Hand.after(at + 0.2) { [weak self] in
+            guard let me = self else { return }
+            Hand.glide(to: Hand.centre(me.ok), 0.6) {
+                Hand.click()
+                Hand.after(0.4) {
+                    if me.win.isVisible { me.done() }
+                    Hand.after(0.3) { Hand.glide(to: CGPoint(x: 1905, y: 1070), 0.9) }
+                }
+            }
+        }
     }
 }
 
 // MARK: - Entry point
 
 let cli = CommandLine.arguments
+if let i = cli.firstIndex(of: "--wallpaper"), i + 1 < cli.count {
+    // used by the automatic build before it records a video
+    for scr in NSScreen.screens {
+        do {
+            try NSWorkspace.shared.setDesktopImageURL(URL(fileURLWithPath: cli[i + 1]), for: scr, options: [:])
+            print("wallpaper set: \(cli[i + 1])")
+        } catch {
+            print("wallpaper failed: \(error)")
+        }
+    }
+    exit(0)
+}
 if let i = cli.firstIndex(of: "--icon"), i + 1 < cli.count {
     renderIcon(cli[i + 1])
     exit(0)

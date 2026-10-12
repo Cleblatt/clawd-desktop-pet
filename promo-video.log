@@ -1,0 +1,67 @@
+wallpaper: /System/Library/Desktop Pictures/Sonoma.heic
+wallpaper set: /System/Library/Desktop Pictures/Sonoma.heic
+
+IOServiceMatchingfailed for: AppleM2ScalerCSCDriver
+cursor option: '-C'
+IOServiceMatchingfailed for: AppleM2ScalerCSCDriver
+total 202288
+drwxr-xr-x  58 runner  staff      1856 Oct 12 13:21 .
+drwxr-xr-x  14 runner  staff       448 Oct 12 13:16 ..
+-rw-r--r--   1 runner  staff        78 Oct 12 13:17 build.log
+-rw-r--r--   1 runner  staff        41 Oct 12 13:16 commit.txt
+-rw-r--r--   1 runner  staff     31770 Oct 12 13:17 icon.png
+-rw-r--r--@  1 runner  staff      3498 Oct 12 13:18 pet.log
+-rw-r--r--   1 runner  staff     26241 Oct 12 13:17 poses.png
+-rw-r--r--@  1 runner  staff   1696303 Oct 12 13:19 pr-01.jpg
+-rw-r--r--@  1 runner  staff   1756538 Oct 12 13:19 pr-02.jpg
+-rw-r--r--@  1 runner  staff   1755372 Oct 12 13:19 pr-03.jpg
+-rw-r--r--@  1 runner  staff   1753403 Oct 12 13:19 pr-04.jpg
+-rw-r--r--@  1 runner  staff   1751059 Oct 12 13:20 pr-05.jpg
+-rw-r--r--@  1 runner  staff   1754652 Oct 12 13:20 pr-06.jpg
+-rw-r--r--@  1 runner  staff   1755254 Oct 12 13:20 pr-07.jpg
+-rw-r--r--@  1 runner  staff   1753225 Oct 12 13:20 pr-08.jpg
+-rw-r--r--@  1 runner  staff   1754209 Oct 12 13:20 pr-09.jpg
+-rw-r--r--@  1 runner  staff   1758180 Oct 12 13:20 pr-10.jpg
+-rw-r--r--@  1 runner  staff   1703689 Oct 12 13:20 pr-11.jpg
+-rw-r--r--@  1 runner  staff   1698351 Oct 12 13:20 pr-12.jpg
+-rw-r--r--@  1 runner  staff   1753031 Oct 12 13:20 pr-13.jpg
+-rw-r--r--@  1 runner  staff   1754113 Oct 12 13:20 pr-14.jpg
+-rw-r--r--@  1 runner  staff   1758383 Oct 12 13:20 pr-15.jpg
+-rw-r--r--@  1 runner  staff   1751842 Oct 12 13:20 pr-16.jpg
+-rw-r--r--@  1 runner  staff   1757285 Oct 12 13:20 pr-17.jpg
+-rw-r--r--@  1 runner  staff   1754547 Oct 12 13:21 pr-18.jpg
+-rw-r--r--@  1 runner  staff   1753608 Oct 12 13:21 pr-19.jpg
+-rw-r--r--   1 runner  staff  56167615 Oct 12 13:20 promo-raw.mov
+-rw-r--r--   1 runner  staff       241 Oct 12 13:19 promo-video.log
+-rw-r--r--@  1 runner  staff      6261 Oct 12 13:21 promo.log
+-rw-r--r--   1 runner  staff         0 Oct 12 13:17 run.log
+-rw-r--r--   1 runner  staff         0 Oct 12 13:18 run2.log
+-rw-r--r--   1 runner  staff         0 Oct 12 13:19 run3.log
+-rw-r--r--@  1 runner  staff      3946 Oct 12 13:19 selftest.log
+-rw-r--r--   1 runner  staff   6382929 Oct 12 13:19 selftest.mp4
+-rw-r--r--@  1 runner  staff    193120 Oct 12 13:17 shot-1-setup.png
+-rw-r--r--@  1 runner  staff    239500 Oct 12 13:17 shot-2-outfit.png
+-rw-r--r--@  1 runner  staff    240418 Oct 12 13:17 shot-3-hungry.png
+-rw-r--r--@  1 runner  staff    245972 Oct 12 13:18 shot-4-levelup.png
+-rw-r--r--@  1 runner  staff    240325 Oct 12 13:18 shot-5-dance.png
+-rw-r--r--@  1 runner  staff    239388 Oct 12 13:18 shot-6-window.png
+-rw-r--r--@  1 runner  staff    351429 Oct 12 13:18 st-01.jpg
+-rw-r--r--@  1 runner  staff    340738 Oct 12 13:18 st-02.jpg
+-rw-r--r--@  1 runner  staff    336787 Oct 12 13:18 st-03.jpg
+-rw-r--r--@  1 runner  staff    342825 Oct 12 13:18 st-04.jpg
+-rw-r--r--@  1 runner  staff    336787 Oct 12 13:18 st-05.jpg
+-rw-r--r--@  1 runner  staff    356326 Oct 12 13:18 st-06.jpg
+-rw-r--r--@  1 runner  staff    334834 Oct 12 13:18 st-07.jpg
+-rw-r--r--@  1 runner  staff    346273 Oct 12 13:18 st-08.jpg
+-rw-r--r--@  1 runner  staff    343456 Oct 12 13:18 st-09.jpg
+-rw-r--r--@  1 runner  staff    342073 Oct 12 13:18 st-10.jpg
+-rw-r--r--@  1 runner  staff    346765 Oct 12 13:19 st-11.jpg
+-rw-r--r--@  1 runner  staff    341277 Oct 12 13:19 st-12.jpg
+-rw-r--r--@  1 runner  staff    341277 Oct 12 13:19 st-13.jpg
+-rw-r--r--@  1 runner  staff    341277 Oct 12 13:19 st-14.jpg
+-rw-r--r--   1 runner  staff        66 Oct 12 13:17 system.txt
+-rw-r--r--   1 runner  staff         0 Oct 12 13:17 test.log
+-rw-r--r--   1 runner  staff      2262 Oct 12 13:19 video.log
+-rw-r--r--   1 runner  staff      5171 Oct 12 13:19 wallpapers.txt
+avconvert completed with error:0.
+

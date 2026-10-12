@@ -1,0 +1,102 @@
+13:19:49.3 hat=none fall x=960 y=165 air=true windows=0 level=5 food=40
+13:19:50.3 hat=none fall x=960 y=882 air=true windows=1 level=5 food=39
+13:19:50.8 landed on ground at y=995
+13:19:51.4 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:19:51.9 promo: scene 0
+13:19:52.4 hat=none wave x=960 y=995 air=false windows=1 level=5 food=39
+13:19:53.5 hat=none wave x=960 y=995 air=false windows=1 level=5 food=39
+13:19:54.5 hat=none wave x=960 y=995 air=false windows=1 level=5 food=39
+13:19:55.1 promo: scene 1
+13:19:55.5 hat=none walk x=921 y=995 air=false windows=1 level=5 food=39
+13:19:56.6 hat=none walk x=792 y=995 air=false windows=1 level=5 food=39
+13:19:57.6 hat=none walk x=663 y=995 air=false windows=1 level=5 food=39
+13:19:58.6 hat=none walk x=543 y=995 air=false windows=1 level=5 food=39
+13:19:59.6 hat=none walk x=423 y=995 air=false windows=1 level=5 food=39
+13:20:00.4 promo: scene 2
+13:20:00.7 hat=none walk x=465 y=995 air=false windows=1 level=5 food=39
+13:20:01.7 hat=none walk x=586 y=995 air=false windows=1 level=5 food=39
+13:20:02.7 hat=none walk x=711 y=995 air=false windows=1 level=5 food=39
+13:20:03.7 hat=none walk x=828 y=995 air=false windows=1 level=5 food=39
+13:20:04.8 hat=none walk x=953 y=995 air=false windows=1 level=5 food=39
+13:20:05.8 hat=none walk x=1081 y=995 air=false windows=1 level=5 food=39
+13:20:06.9 hat=none idle x=1152 y=995 air=false windows=1 level=5 food=39
+13:20:07.3 promo: scene 3
+13:20:07.3 landed on window 33 at y=159
+13:20:07.9 hat=none idle x=960 y=159 air=false windows=1 level=5 food=39
+13:20:08.9 hat=none idle x=960 y=159 air=false windows=1 level=5 food=39
+13:20:08.9 promo: scene 4
+13:20:10.0 hat=none walk x=834 y=159 air=false windows=1 level=5 food=39
+13:20:10.8 promo: scene 5
+13:20:11.0 hat=none run x=726 y=159 air=false windows=1 level=5 food=39
+13:20:11.5 lost the window under him
+13:20:12.1 hat=none fall x=494 y=597 air=true windows=1 level=5 food=39
+13:20:13.0 landed on ground at y=995
+13:20:13.1 hat=none idle x=494 y=995 air=false windows=1 level=5 food=39
+13:20:14.1 hat=none idle x=494 y=995 air=false windows=1 level=5 food=39
+13:20:15.1 hat=none idle x=494 y=995 air=false windows=1 level=5 food=39
+13:20:15.8 promo: scene 6
+13:20:16.1 hat=none walk x=525 y=995 air=false windows=1 level=5 food=39
+13:20:17.2 hat=none walk x=655 y=995 air=false windows=1 level=5 food=39
+13:20:18.2 hat=none walk x=774 y=995 air=false windows=1 level=5 food=39
+13:20:19.2 hat=none walk x=897 y=995 air=false windows=1 level=5 food=39
+13:20:20.3 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:20.5 promo: scene 7
+13:20:21.3 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:22.4 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:23.4 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:24.4 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:25.5 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:26.5 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:27.5 hat=none code x=960 y=995 air=false windows=1 level=5 food=39
+13:20:27.8 promo: scene 8
+13:20:28.5 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:29.6 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:30.7 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:31.7 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:32.7 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:33.8 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:34.2 promo: the menu was open and closed again
+13:20:34.8 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:35.9 hat=none idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:36.3 promo: scene 9
+13:20:36.9 hat=cap idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:37.5 promo: scene 10
+13:20:37.9 hat=party idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:38.6 promo: scene 11
+13:20:39.0 hat=phones idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:39.9 promo: scene 12
+13:20:40.0 hat=tophat idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:41.0 hat=tophat idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:41.0 promo: scene 13
+13:20:42.0 hat=crown idle x=960 y=995 air=false windows=1 level=5 food=39
+13:20:42.2 promo: scene 14
+13:20:43.0 hat=none eat x=960 y=995 air=false windows=1 level=5 food=74
+13:20:44.1 hat=none eat x=960 y=995 air=false windows=1 level=5 food=74
+13:20:45.1 hat=none eat x=960 y=995 air=false windows=1 level=5 food=74
+13:20:46.1 hat=none idle x=960 y=995 air=false windows=1 level=5 food=74
+13:20:46.5 promo: scene 15
+13:20:47.0 landed on ground at y=995
+13:20:47.2 hat=none jump x=960 y=917 air=true windows=1 level=6 food=74
+13:20:47.5 landed on ground at y=995
+13:20:48.1 landed on ground at y=995
+13:20:48.2 hat=none idle x=960 y=995 air=false windows=1 level=6 food=74
+13:20:49.2 hat=none idle x=960 y=995 air=false windows=1 level=6 food=74
+13:20:50.3 hat=none idle x=960 y=995 air=false windows=1 level=6 food=74
+13:20:51.3 hat=none idle x=960 y=995 air=false windows=1 level=6 food=74
+13:20:52.3 hat=none idle x=960 y=995 air=false windows=1 level=6 food=74
+13:20:52.6 promo: scene 16
+13:20:53.4 hat=crown dance x=960 y=995 air=false windows=1 level=6 food=74
+13:20:54.4 hat=crown dance x=960 y=995 air=false windows=1 level=6 food=74
+13:20:55.5 hat=crown dance x=960 y=995 air=false windows=1 level=6 food=74
+13:20:56.5 hat=crown dance x=960 y=995 air=false windows=1 level=6 food=74
+13:20:57.5 hat=crown dance x=960 y=995 air=false windows=1 level=6 food=74
+13:20:57.6 promo: scene 17
+13:20:58.5 hat=crown wave x=960 y=995 air=false windows=1 level=6 food=74
+13:20:59.6 hat=crown wave x=960 y=995 air=false windows=1 level=6 food=74
+13:21:00.6 hat=crown wave x=960 y=995 air=false windows=1 level=6 food=74
+13:21:01.6 hat=crown idle x=960 y=995 air=false windows=1 level=6 food=74
+13:21:01.7 promo: scene 18
+13:21:01.7 promo: done
+13:21:02.6 hat=crown idle x=960 y=995 air=false windows=1 level=6 food=74
+13:21:03.7 hat=crown idle x=960 y=995 air=false windows=1 level=6 food=74
+13:21:04.7 hat=crown idle x=960 y=995 air=false windows=1 level=6 food=74

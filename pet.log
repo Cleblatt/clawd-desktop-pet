@@ -1,0 +1,48 @@
+13:17:39.7 hat=none fall x=960 y=245 air=true windows=0 level=1 food=80
+13:17:40.8 hat=none fall x=960 y=995 air=true windows=1 level=1 food=79
+13:17:41.8 landed on ground at y=995
+13:17:41.9 hat=none idle x=960 y=995 air=false windows=1 level=1 food=79
+13:17:42.9 demo0 hat=none wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:43.9 demo1 hat=cap wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:45.0 demo2 hat=party wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:46.0 demo2 hat=party wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:47.0 demo3 hat=phones wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:48.0 demo4 hat=tophat wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:49.1 demo4 hat=tophat wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:50.2 demo5 hat=crown wave x=960 y=995 air=false windows=1 level=1 food=79
+13:17:51.3 demo6 hat=none idle x=960 y=995 air=false windows=1 level=1 food=12
+13:17:52.3 demo6 hat=none idle x=960 y=995 air=false windows=1 level=1 food=12
+13:17:53.4 demo6 hat=none idle x=960 y=995 air=false windows=1 level=1 food=12
+13:17:54.5 demo7 hat=none eat x=960 y=995 air=false windows=1 level=1 food=60
+13:17:55.5 demo7 hat=none eat x=960 y=995 air=false windows=1 level=1 food=60
+13:17:56.6 demo7 hat=none eat x=960 y=995 air=false windows=1 level=1 food=60
+13:17:57.6 demo7 hat=none idle x=960 y=995 air=false windows=1 level=1 food=60
+13:17:58.4 landed on ground at y=995
+13:17:58.7 demo8 hat=none jump x=960 y=952 air=true windows=1 level=1 food=60
+13:17:59.0 landed on ground at y=995
+13:17:59.6 landed on ground at y=995
+13:17:59.8 demo8 hat=none idle x=960 y=995 air=false windows=1 level=1 food=60
+13:18:00.8 demo8 hat=none idle x=960 y=995 air=false windows=1 level=1 food=60
+13:18:01.9 demo8 hat=none idle x=960 y=995 air=false windows=1 level=1 food=60
+13:18:03.0 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:04.1 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:05.2 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:06.2 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:07.3 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:08.4 demo9 hat=phones dance x=960 y=995 air=false windows=1 level=1 food=60
+13:18:09.1 landed on window 27 at y=159
+13:18:09.5 demo10 hat=none idle x=960 y=159 air=false windows=1 level=1 food=60
+13:18:10.5 demo10 hat=none idle x=960 y=159 air=false windows=1 level=1 food=60
+13:18:11.6 demo10 hat=none idle x=960 y=159 air=false windows=1 level=1 food=60
+13:18:12.6 demo11 hat=none run x=1030 y=159 air=false windows=1 level=1 food=60
+13:18:13.6 demo11 hat=none run x=1242 y=159 air=false windows=1 level=1 food=60
+13:18:14.5 lost the window under him
+13:18:14.7 demo11 hat=none fall x=1435 y=197 air=true windows=1 level=1 food=60
+13:18:15.7 demo11 hat=none fall x=1435 y=956 air=true windows=1 level=1 food=60
+13:18:16.8 landed on ground at y=995
+13:18:16.9 demo11 hat=none idle x=1435 y=995 air=false windows=1 level=1 food=60
+13:18:17.9 demo11 hat=none idle x=1435 y=995 air=false windows=1 level=1 food=60
+13:18:18.9 hat=none sleep x=1435 y=995 air=false windows=1 level=1 food=79
+13:18:20.0 hat=none sleep x=1435 y=995 air=false windows=1 level=1 food=79
+13:18:21.0 hat=none sleep x=1435 y=995 air=false windows=1 level=1 food=79
+13:18:22.1 hat=none sleep x=1435 y=995 air=false windows=1 level=1 food=79

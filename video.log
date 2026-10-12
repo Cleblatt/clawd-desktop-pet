@@ -1,0 +1,39 @@
+IOServiceMatchingfailed for: AppleM2ScalerCSCDriver
+total 26784
+drwxr-xr-x  34 runner  staff     1088 Oct 12 13:19 .
+drwxr-xr-x  14 runner  staff      448 Oct 12 13:16 ..
+-rw-r--r--   1 runner  staff       78 Oct 12 13:17 build.log
+-rw-r--r--   1 runner  staff       41 Oct 12 13:16 commit.txt
+-rw-r--r--   1 runner  staff    31770 Oct 12 13:17 icon.png
+-rw-r--r--@  1 runner  staff     3498 Oct 12 13:18 pet.log
+-rw-r--r--   1 runner  staff    26241 Oct 12 13:17 poses.png
+-rw-r--r--   1 runner  staff        0 Oct 12 13:17 run.log
+-rw-r--r--   1 runner  staff        0 Oct 12 13:18 run2.log
+-rw-r--r--   1 runner  staff  6518210 Oct 12 13:19 selftest-raw.mov
+-rw-r--r--@  1 runner  staff     3946 Oct 12 13:19 selftest.log
+-rw-r--r--@  1 runner  staff   193120 Oct 12 13:17 shot-1-setup.png
+-rw-r--r--@  1 runner  staff   239500 Oct 12 13:17 shot-2-outfit.png
+-rw-r--r--@  1 runner  staff   240418 Oct 12 13:17 shot-3-hungry.png
+-rw-r--r--@  1 runner  staff   245972 Oct 12 13:18 shot-4-levelup.png
+-rw-r--r--@  1 runner  staff   240325 Oct 12 13:18 shot-5-dance.png
+-rw-r--r--@  1 runner  staff   239388 Oct 12 13:18 shot-6-window.png
+-rw-r--r--@  1 runner  staff   351429 Oct 12 13:18 st-01.jpg
+-rw-r--r--@  1 runner  staff   340738 Oct 12 13:18 st-02.jpg
+-rw-r--r--@  1 runner  staff   336787 Oct 12 13:18 st-03.jpg
+-rw-r--r--@  1 runner  staff   342825 Oct 12 13:18 st-04.jpg
+-rw-r--r--@  1 runner  staff   336787 Oct 12 13:18 st-05.jpg
+-rw-r--r--@  1 runner  staff   356326 Oct 12 13:18 st-06.jpg
+-rw-r--r--@  1 runner  staff   334834 Oct 12 13:18 st-07.jpg
+-rw-r--r--@  1 runner  staff   346273 Oct 12 13:18 st-08.jpg
+-rw-r--r--@  1 runner  staff   343456 Oct 12 13:18 st-09.jpg
+-rw-r--r--@  1 runner  staff   342073 Oct 12 13:18 st-10.jpg
+-rw-r--r--@  1 runner  staff   346765 Oct 12 13:19 st-11.jpg
+-rw-r--r--@  1 runner  staff   341277 Oct 12 13:19 st-12.jpg
+-rw-r--r--@  1 runner  staff   341277 Oct 12 13:19 st-13.jpg
+-rw-r--r--@  1 runner  staff   341277 Oct 12 13:19 st-14.jpg
+-rw-r--r--   1 runner  staff       66 Oct 12 13:17 system.txt
+-rw-r--r--   1 runner  staff        0 Oct 12 13:17 test.log
+-rw-r--r--   1 runner  staff       52 Oct 12 13:18 video.log
+IOServiceMatchingfailed for: AppleM2ScalerCSCDriver
+avconvert completed with error:0.
+

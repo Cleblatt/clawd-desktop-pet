@@ -1,0 +1,71 @@
+total 319624
+drwxr-xr-x   70 root  wheel      2240 Aug  4 07:59 .
+drwxr-xr-x  149 root  wheel      4768 Aug  4 07:59 ..
+-rw-r--r--    1 root  wheel      6498 Aug  4 07:59 .orderedPictures.plist
+drwxr-xr-x  128 root  wheel      4096 Aug  4 07:59 .thumbnails
+drwxr-xr-x    4 root  wheel       128 Aug  4 07:59 .wallpapers
+-rw-r--r--    1 root  wheel       515 Aug  4 07:59 Big Sur Aerial.madesktop
+-rw-r--r--    1 root  wheel       521 Aug  4 07:59 Big Sur Coastline.madesktop
+-rw-r--r--    1 root  wheel       522 Aug  4 07:59 Big Sur Graphic.madesktop
+-rw-r--r--    1 root  wheel       517 Aug  4 07:59 Big Sur Horizon.madesktop
+-rw-r--r--    1 root  wheel       521 Aug  4 07:59 Big Sur Mountains.madesktop
+-rw-r--r--    1 root  wheel       529 Aug  4 07:59 Big Sur Night Grasses.madesktop
+-rw-r--r--    1 root  wheel       535 Aug  4 07:59 Big Sur Night Succulents.madesktop
+-rw-r--r--    1 root  wheel       511 Aug  4 07:59 Big Sur Road.madesktop
+-rw-r--r--    1 root  wheel       525 Aug  4 07:59 Big Sur Shore Rocks.madesktop
+-rw-r--r--    1 root  wheel       525 Aug  4 07:59 Big Sur Waters Edge.madesktop
+-rw-r--r--    1 root  wheel       505 Aug  4 07:59 Big Sur.madesktop
+-rw-r--r--    1 root  wheel       517 Aug  4 07:59 Catalina Clouds.madesktop
+-rw-r--r--    1 root  wheel       515 Aug  4 07:59 Catalina Coast.madesktop
+-rw-r--r--    1 root  wheel       519 Aug  4 07:59 Catalina Evening.madesktop
+-rw-r--r--    1 root  wheel       513 Aug  4 07:59 Catalina Rock.madesktop
+-rw-r--r--    1 root  wheel       523 Aug  4 07:59 Catalina Shoreline.madesktop
+-rw-r--r--    1 root  wheel       525 Aug  4 07:59 Catalina Silhouette.madesktop
+-rw-r--r--    1 root  wheel       517 Aug  4 07:59 Catalina Sunset.madesktop
+-rw-r--r--    1 root  wheel       507 Aug  4 07:59 Catalina.madesktop
+-rw-r--r--    1 root  wheel       514 Aug  4 07:59 Chroma Blue.madesktop
+-rw-r--r--    1 root  wheel       512 Aug  4 07:59 Chroma Red.madesktop
+-rw-r--r--    1 root  wheel       500 Aug  4 07:59 Dome.madesktop
+-rw-r--r--    1 root  wheel       512 Aug  4 07:59 Grid Green.madesktop
+-rw-r--r--    1 root  wheel       516 Aug  4 07:59 Grid Magenta.madesktop
+-rw-r--r--    1 root  wheel  18815462 Aug  4 07:59 Hello Metallic Blue.heic
+-rw-r--r--    1 root  wheel  18489828 Aug  4 07:59 Hello Metallic Green.heic
+-rw-r--r--    1 root  wheel  18409198 Aug  4 07:59 Hello Metallic Orange.heic
+-rw-r--r--    1 root  wheel  18532228 Aug  4 07:59 Hello Metallic Pink.heic
+-rw-r--r--    1 root  wheel  18339484 Aug  4 07:59 Hello Metallic Purple.heic
+-rw-r--r--    1 root  wheel  18961872 Aug  4 07:59 Hello Metallic Silver.heic
+-rw-r--r--    1 root  wheel  18335087 Aug  4 07:59 Hello Metallic Yellow.heic
+-rw-r--r--    1 root  wheel       514 Aug  4 07:59 Iridescence.madesktop
+-rw-r--r--    1 root  wheel       521 Aug  4 07:59 Light Stream Blue.madesktop
+-rw-r--r--    1 root  wheel       523 Aug  4 07:59 Light Stream Green.madesktop
+-rw-r--r--    1 root  wheel       521 Aug  4 07:59 Light Stream Pink.madesktop
+-rw-r--r--    1 root  wheel       519 Aug  4 07:59 Light Stream Red.madesktop
+-rw-r--r--    1 root  wheel       523 Aug  4 07:59 Monterey Graphic.madesktop
+-rw-r--r--    1 root  wheel       514 Aug  4 07:59 Motion Blue.madesktop
+-rw-r--r--    1 root  wheel       516 Aug  4 07:59 Motion Green.madesktop
+-rw-r--r--    1 root  wheel       518 Aug  4 07:59 Motion Purple.madesktop
+-rw-r--r--    1 root  wheel       518 Aug  4 07:59 Motion Yellow.madesktop
+-rw-r--r--    1 root  wheel       500 Aug  4 07:59 Peak.madesktop
+-rw-r--r--    1 root  wheel  13151327 Aug  4 07:59 Pro Black.heic
+-rw-r--r--    1 root  wheel       509 Aug  4 07:59 Radial Blue.madesktop
+-rw-r--r--    1 root  wheel       511 Aug  4 07:59 Radial Green.madesktop
+-rw-r--r--    1 root  wheel       513 Aug  4 07:59 Radial Purple.madesktop
+-rw-r--r--    1 root  wheel       513 Aug  4 07:59 Radial Yellow.madesktop
+-rw-r--r--    1 root  wheel       569 Aug  4 07:59 Solar Gradients.madesktop
+drwxr-xr-x   22 root  wheel       704 Aug  4 07:59 Solid Colors
+-rw-r--r--    1 root  wheel  20362274 Aug  4 07:59 Sonoma.heic
+-rw-r--r--    1 root  wheel       511 Aug  4 07:59 Studio Color.madesktop
+-rw-r--r--    1 root  wheel       509 Aug  4 07:59 The Beach.madesktop
+-rw-r--r--    1 root  wheel       511 Aug  4 07:59 The Cliffs.madesktop
+-rw-r--r--    1 root  wheel       511 Aug  4 07:59 The Desert.madesktop
+-rw-r--r--    1 root  wheel       507 Aug  4 07:59 The Lake.madesktop
+-rw-r--r--    1 root  wheel       500 Aug  4 07:59 Tree.madesktop
+-rw-r--r--    1 root  wheel       504 Aug  4 07:59 Valley.madesktop
+-rw-r--r--    1 root  wheel       521 Aug  4 07:59 Ventura Graphic.madesktop
+-rw-r--r--    1 root  wheel       512 Aug  4 07:59 hello Blue.madesktop
+-rw-r--r--    1 root  wheel       514 Aug  4 07:59 hello Green.madesktop
+-rw-r--r--    1 root  wheel       512 Aug  4 07:59 hello Grey.madesktop
+-rw-r--r--    1 root  wheel       516 Aug  4 07:59 hello Orange.madesktop
+-rw-r--r--    1 root  wheel       516 Aug  4 07:59 hello Purple.madesktop
+-rw-r--r--    1 root  wheel       510 Aug  4 07:59 hello Red.madesktop
+-rw-r--r--    1 root  wheel       516 Aug  4 07:59 hello Yellow.madesktop

@@ -35,7 +35,7 @@
 
 - **Hunger:** he gets hungry over time and shows a little cookie bubble when he wants food
 - **Levels:** feeding and petting earn XP. New levels unlock tricks (flip, juggling, balloon ride, wall climbing), colors and outfits
-- **Outfits:** beanie, party hat, headphones, top hat and crown, picked from the right-click menu
+- **Outfits:** beanie, party hat, headphones, top hat and crown, picked from the right-click menu – plus a flower as a thank-you when you open the feedback form
 
 **You can play with him**
 

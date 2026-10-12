@@ -110,8 +110,15 @@ static class Cfg
     public static readonly int[] SizeVals = { 3, 5, 7, 10 };
     public static readonly string[] ColVals = { Orange, "#F06FA8", "#4A90D9", "#3FA66B", "#9B6FE8", "#3DD6D0", "#E8B923" };
     public static readonly int[] ColLevel = { 1, 1, 1, 2, 3, 4, 5 };
-    public static readonly string[] HatVals = { "none", "cap", "party", "phones", "tophat", "crown" };
-    public static readonly int[] HatLevel = { 1, 1, 1, 2, 4, 6 };
+    public static readonly string[] HatVals = { "none", "cap", "party", "phones", "tophat", "crown", "flower" };
+    // 99 = not a level reward: the flower is a thank-you for opening the feedback form
+    public static readonly int[] HatLevel = { 1, 1, 1, 2, 4, 6, 99 };
+    public const int ByFeedback = 99;
+    public static bool Thanked
+    {
+        get { return HatLevel[6] == 1; }
+        set { HatLevel[6] = value ? 1 : ByFeedback; }
+    }
 
     public static string T(string de, string en) { return Lang == "de" ? de : en; }
 
@@ -127,7 +134,7 @@ static class Cfg
 
     public static string[] HatLabels()
     {
-        return new string[] { T("Ohne", "None"), T("Mütze", "Beanie"), T("Partyhut", "Party hat"), T("Kopfhörer", "Headphones"), T("Zylinder", "Top hat"), T("Krone", "Crown") };
+        return new string[] { T("Ohne", "None"), T("Mütze", "Beanie"), T("Partyhut", "Party hat"), T("Kopfhörer", "Headphones"), T("Zylinder", "Top hat"), T("Krone", "Crown"), T("Blume", "Flower") };
     }
 
     static string FilePath
@@ -153,6 +160,7 @@ static class Cfg
                 if (kv[0] == "stamp") Stamp = long.Parse(kv[1]);
                 if (kv[0] == "hat" && Array.IndexOf(HatVals, kv[1]) >= 0) Hat = kv[1];
                 if (kv[0] == "music") Music = kv[1] == "1";
+                if (kv[0] == "thanks") Thanked = kv[1] == "1";
             }
             // He also gets hungry while the PC is off - but slowly, and never all the way
             if (Stamp > 0)
@@ -171,7 +179,7 @@ static class Cfg
         {
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
             File.WriteAllLines(FilePath, new string[] { "lang=" + Lang, "size=" + Size, "talk=" + (Talk ? "1" : "0"), "color=" + Color, "setup=" + (AlwaysSetup ? "always" : "first"),
-                "xp=" + Xp, "food=" + Food.ToString("0.#", CultureInfo.InvariantCulture), "stamp=" + DateTime.UtcNow.Ticks, "hat=" + Hat, "music=" + (Music ? "1" : "0") });
+                "xp=" + Xp, "food=" + Food.ToString("0.#", CultureInfo.InvariantCulture), "stamp=" + DateTime.UtcNow.Ticks, "hat=" + Hat, "music=" + (Music ? "1" : "0"), "thanks=" + (Thanked ? "1" : "0") });
         }
         catch { }
     }
@@ -1533,6 +1541,16 @@ class PetWindow : Window
             System.Diagnostics.Process.Start("https://tally.so/r/2EqDqb?version=1.3&os=" + os);
         }
         catch { }
+        // a little thank-you: the flower outfit
+        if (!Cfg.Thanked)
+        {
+            Cfg.Thanked = true;
+            Cfg.Hat = "flower";
+            Cfg.Save();
+            Confetti();
+            Announce(T("Danke! Neues Outfit: Blume", "Thank you! New outfit: Flower"), 5);
+            RebuildUi();
+        }
     }
 
     MenuItem MI(string header, Action a)
@@ -1555,7 +1573,7 @@ class PetWindow : Window
             m.IsChecked = i == selected;
             if (need != null && need[i] > Cfg.Level && !demo && i != selected)
             {
-                m.Header = labels[i] + "  ·  Level " + need[i];
+                m.Header = labels[i] + (need[i] == Cfg.ByFeedback ? "  ·  Feedback" : "  ·  Level " + need[i]);
                 m.IsEnabled = false;
             }
             m.Click += delegate
@@ -2098,6 +2116,7 @@ class PetWindow : Window
             case "phones": return 2;
             case "tophat": return 6;
             case "crown": return 5;
+            case "flower": return 6;
         }
         return 0;
     }
@@ -2736,6 +2755,13 @@ class PetWindow : Window
                 C(dc, red, -0.5, top - 1.5, 1, 1);
                 C(dc, blue, -3.3, top - 1.5, 1, 1);
                 C(dc, blue, 2.3, top - 1.5, 1, 1);
+                break;
+            case "flower":
+                C(dc, green, -0.5, top - 3, 1, 3);
+                C(dc, green, 0.5, top - 2, 1.5, 1);
+                C(dc, pink, -1.5, top - 5, 3, 1);
+                C(dc, pink, -0.5, top - 6, 1, 3);
+                C(dc, yellow, -0.5, top - 5, 1, 1);
                 break;
         }
     }

@@ -71,15 +71,18 @@ enum Cfg {
     static let sizeVals = [3, 5, 7, 10]
     static let colVals = [orange, "#F06FA8", "#4A90D9", "#3FA66B", "#9B6FE8", "#3DD6D0", "#E8B923"]
     static let colLevel = [1, 1, 1, 2, 3, 4, 5]
-    static let hatVals = ["none", "cap", "party", "phones", "tophat", "crown"]
-    static let hatLevel = [1, 1, 1, 2, 4, 6]
+    static let hatVals = ["none", "cap", "party", "phones", "tophat", "crown", "flower"]
+    // 99 = not a level reward: the flower is a thank-you for opening the feedback form
+    static let byFeedback = 99
+    static var thanked = false
+    static var hatLevel: [Int] { return [1, 1, 1, 2, 4, 6, thanked ? 1 : byFeedback] }
 
     static var level: Int { return 1 + Int((Double(xp) / 15.0).squareRoot()) }
     static func xpFor(_ level: Int) -> Int { return 15 * (level - 1) * (level - 1) }
 
     static var sizeLabels: [String] { return [T("Klein", "Small"), T("Mittel", "Medium"), T("Groß", "Large"), T("Riesig", "Huge")] }
     static var colLabels: [String] { return ["Orange", "Pink", T("Blau", "Blue"), T("Grün", "Green"), T("Lila", "Purple"), T("Türkis", "Teal"), "Gold"] }
-    static var hatLabels: [String] { return [T("Ohne", "None"), T("Mütze", "Beanie"), T("Partyhut", "Party hat"), T("Kopfhörer", "Headphones"), T("Zylinder", "Top hat"), T("Krone", "Crown")] }
+    static var hatLabels: [String] { return [T("Ohne", "None"), T("Mütze", "Beanie"), T("Partyhut", "Party hat"), T("Kopfhörer", "Headphones"), T("Zylinder", "Top hat"), T("Krone", "Crown"), T("Blume", "Flower")] }
 
     static func load() {
         let d = UserDefaults.standard
@@ -93,6 +96,7 @@ enum Cfg {
         xp = max(0, d.integer(forKey: "xp"))
         if d.object(forKey: "food") != nil { food = max(0, min(100, d.double(forKey: "food"))) }
         if let h = d.string(forKey: "hat"), hatVals.contains(h) { hat = h }
+        thanked = d.bool(forKey: "thanks")
         // He also gets hungry while the Mac is off - but slowly, and never all the way
         let stamp = d.double(forKey: "stamp")
         if stamp > 0 {
@@ -111,6 +115,7 @@ enum Cfg {
         d.set(xp, forKey: "xp")
         d.set(food, forKey: "food")
         d.set(hat, forKey: "hat")
+        d.set(thanked, forKey: "thanks")
         d.set(Date().timeIntervalSince1970, forKey: "stamp")
     }
 
@@ -456,6 +461,7 @@ final class Pet: NSView {
         case "phones": return 2
         case "tophat": return 6
         case "crown": return 5
+        case "flower": return 6
         default: return 0
         }
     }
@@ -1411,6 +1417,12 @@ final class Pet: NSView {
             C(Ink.red, -0.5, top - 1.5, 1, 1)
             C(Ink.blue, -3.3, top - 1.5, 1, 1)
             C(Ink.blue, 2.3, top - 1.5, 1, 1)
+        case "flower":
+            C(Ink.green, -0.5, top - 3, 1, 3)
+            C(Ink.green, 0.5, top - 2, 1.5, 1)
+            C(Ink.pink, -1.5, top - 5, 3, 1)
+            C(Ink.pink, -0.5, top - 6, 1, 3)
+            C(Ink.yellow, -0.5, top - 5, 1, 1)
         default: break
         }
     }
@@ -2077,7 +2089,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         sub.autoenablesItems = false
         for (i, label) in labels.enumerated() {
             let locked = need != nil && need![i] > Cfg.level && !pet.demo && i != selected
-            sub.addItem(Item(locked ? label + "  ·  Level \(need![i])" : label, checked: i == selected, enabled: !locked) {
+            let why = locked && need![i] == Cfg.byFeedback ? "Feedback" : "Level \(locked ? need![i] : 0)"
+            sub.addItem(Item(locked ? label + "  ·  " + why : label, checked: i == selected, enabled: !locked) {
                 pick(i)
                 Cfg.save()
             })
@@ -2146,6 +2159,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let v = ProcessInfo.processInfo.operatingSystemVersion
             let os = "macOS%20\(v.majorVersion).\(v.minorVersion)"
             if let url = URL(string: "https://tally.so/r/2EqDqb?version=1.3&os=" + os) { NSWorkspace.shared.open(url) }
+            // a little thank-you: the flower outfit
+            if !Cfg.thanked {
+                Cfg.thanked = true
+                Cfg.hat = "flower"
+                Cfg.save()
+                p.confetti()
+                p.announce(T("Danke! Neues Outfit: Blume", "Thank you! New outfit: Flower"), 5)
+            }
         })
 
         if promoMode {

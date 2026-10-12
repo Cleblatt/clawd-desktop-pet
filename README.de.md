@@ -35,7 +35,7 @@
 
 - **Hunger:** Mit der Zeit bekommt er Hunger und zeigt eine kleine Keks-Blase, wenn er Futter will
 - **Level:** Füttern und Streicheln geben XP. Neue Level schalten Tricks (Salto, Jonglieren, Ballonfahrt, Wand hochklettern), Farben und Outfits frei
-- **Outfits:** Mütze, Partyhut, Kopfhörer, Zylinder und Krone, auswählbar im Rechtsklick-Menü
+- **Outfits:** Mütze, Partyhut, Kopfhörer, Zylinder und Krone, auswählbar im Rechtsklick-Menü – dazu eine Blume als Dankeschön, wenn du das Feedback-Formular öffnest
 
 **Du kannst mit ihm spielen**
 

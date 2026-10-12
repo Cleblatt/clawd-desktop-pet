@@ -63,6 +63,22 @@ jobs:
           screencapture -x out/shot-6-window.png || true
           sleep 9
           pkill -x ClawdPet || true
+          sleep 1
+          # self-test with a video: the app clicks, flips, drags and throws itself, opens its menu, types, dances
+          "$APP/Contents/MacOS/ClawdPet" --log "$PWD/out/selftest.log" --selftest > out/run2.log 2>&1 &
+          sleep 1
+          screencapture -v -V 44 -x out/selftest-raw.mov > out/video.log 2>&1 &
+          REC=$!
+          for i in 01 02 03 04 05 06 07 08 09 10 11 12 13 14; do
+            sleep 3
+            screencapture -x -t jpg "out/st-$i.jpg" || true
+          done
+          wait $REC || true
+          pkill -x ClawdPet || true
+          ls -la out >> out/video.log
+          if [ -s out/selftest-raw.mov ]; then
+            avconvert --source out/selftest-raw.mov --preset Preset1280x720 --output out/selftest.mp4 >> out/video.log 2>&1 && rm out/selftest-raw.mov || true
+          fi
 
       - name: Publish results
         if: always()

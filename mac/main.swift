@@ -225,6 +225,14 @@ final class Pet: NSView {
     var logT = 0.0
     var onMenu: ((NSEvent) -> Void)?
 
+    // Self-test for the automatic build: the app plays with itself while a video is recorded
+    var selfTest = false, gotRealMouse = false
+    var stStep = 0, typeTick = 0
+    var stT = 2.5, dragU = -1.0, typeSim = 0.0
+    var fakeCur: (x: Double, y: Double)?
+    var dragFrom = (x: 0.0, y: 0.0)
+    var onAutoMenu: (() -> Void)?
+
     override var isFlipped: Bool { return true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { return true }
 
@@ -283,17 +291,27 @@ final class Pet: NSView {
     // MARK: Mouse
 
     func readCursor() {
+        if let f = fakeCur {
+            curX = f.x
+            curY = f.y
+            return
+        }
         let m = NSEvent.mouseLocation
         curX = Double(m.x)
         curY = screenH - Double(m.y)
     }
 
     override func mouseDown(with e: NSEvent) {
-        readCursor()
+        gotRealMouse = true
         if e.clickCount == 2 {
             if !air && y >= ground - 1 { set(Cfg.level >= Pet.actLevel("flip") || demo ? "flip" : "jump") }
             return
         }
+        press()
+    }
+
+    func press() {
+        readCursor()
         pressed = true
         pressX = curX
         pressY = curY
@@ -303,7 +321,9 @@ final class Pet: NSView {
         thvy = 0
     }
 
-    override func mouseUp(with e: NSEvent) {
+    override func mouseUp(with e: NSEvent) { release() }
+
+    func release() {
         if !pressed { return }
         pressed = false
         if dragging {
@@ -524,6 +544,90 @@ final class Pet: NSView {
         }
     }
 
+    // MARK: Self-test
+
+    // Sends a real mouse click through the system, the way a hand on the mouse would.
+    func postClick(_ px: Double, _ py: Double) {
+        let pt = CGPoint(x: px, y: py)
+        let src = CGEventSource(stateID: .hidSystemState)
+        for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
+            CGEvent(mouseEventSource: src, mouseType: type, mouseCursorPosition: pt, mouseButton: .left)?.post(tap: .cghidEventTap)
+        }
+    }
+
+    func selfTestTick(_ dt: Double) {
+        if dragU >= 0 {
+            // being carried up and to the side, then let go while still moving
+            dragU += dt / 1.1
+            let u = min(1, dragU)
+            fakeCur = (dragFrom.x + 420 * u * u, dragFrom.y - 380 * u)
+            if dragU >= 1 {
+                dragU = -1
+                readCursor()
+                release()
+                fakeCur = nil
+                log("selftest: let go - thrown with vx=\(Int(vx)) vy=\(Int(vy))")
+            }
+            return
+        }
+        if typeSim > 0 { typeSim -= dt }
+        stT -= dt
+        if stT > 0 || air { return }
+        let step = stStep
+        stStep += 1
+        switch step {
+        case 0:
+            log("selftest: sending a real mouse click to his body")
+            gotRealMouse = false
+            postClick(x, y - 6 * S)
+            stT = 1.2
+        case 1:
+            if gotRealMouse {
+                log("selftest: the real click arrived - petting works with the mouse")
+            } else {
+                log("selftest: real clicks cannot be sent on this machine - calling the click handler directly")
+                petIt()
+            }
+            stT = 2.6
+        case 2:
+            log("selftest: double-click -> flip")
+            set("flip")
+            stT = 1.2
+        case 3:
+            log("selftest: picking him up and throwing him")
+            fakeCur = (x, y - 6 * S)
+            press()
+            dragFrom = (x, y - 6 * S)
+            dragU = 0
+            stT = 1.8
+        case 4:
+            log("selftest: opening the right-click menu")
+            onAutoMenu?()
+            stT = 4.2
+        case 5:
+            log("selftest: typing -> he types along")
+            typeSim = 3.6
+            stT = 6.5
+        case 6:
+            log("selftest: crown on, dancing")
+            Cfg.hat = "crown"
+            set("dance")
+            stT = 5
+        case 7:
+            log("selftest: walking")
+            Cfg.hat = "cap"
+            set("walk")
+            stT = 5
+        case 8:
+            Cfg.hat = "phones"
+            set("wave")
+            stT = 3
+        default:
+            log("selftest: done")
+            selfTest = false
+        }
+    }
+
     // MARK: Logic
 
     func R() -> Double { return Double.random(in: 0..<1) }
@@ -705,6 +809,7 @@ final class Pet: NSView {
             scanWindows()
         }
         if featDemo && !menuOpen { featureDemo(dt) }
+        if selfTest && !menuOpen { selfTestTick(dt) }
         if !menuOpen { updatePet(dt) }
         updateParticles(dt)
         place()
@@ -745,8 +850,12 @@ final class Pet: NSView {
     // Only counts THAT keys are being pressed - never which ones. Nothing is stored or sent.
     func readInput(_ dt: Double) {
         let n = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
-        let hits = n &- keyCount
+        var hits = n &- keyCount
         keyCount = n
+        if typeSim > 0 && Int(anim * 9) != typeTick {
+            typeTick = Int(anim * 9)
+            hits = 1
+        }
         if demo || featDemo { return } // the script decides, not the keyboard
         typingT += dt
         tapT -= dt
@@ -764,7 +873,7 @@ final class Pet: NSView {
             }
         }
         // Nobody there -> fall asleep; back again -> wake up and wave
-        let away = idle > 120
+        let away = idle > 120 && !selfTest
         if away && isCalm && st != "sleep" { set("sleep") }
         if wasAway && !away && st == "sleep" { set("wave") }
         wasAway = away
@@ -1695,6 +1804,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Cfg.load()
         let logging = args.contains("--log")
         if logging { Cfg.readOnly = true }
+        if args.contains("--selftest") {
+            // big, talkative and with everything unlocked, so the video shows as much as possible
+            Cfg.readOnly = true
+            Cfg.size = 10
+            Cfg.xp = 9999
+            Cfg.talk = true
+            Cfg.lang = "en"
+        }
         if (Cfg.firstRun || args.contains("--setup")) && !args.contains("--skip-setup") && !logging {
             SetupWindow().runModal()
         }
@@ -1713,6 +1830,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pet.demo = args.contains("--demo")
         if let i = args.firstIndex(of: "--log"), i + 1 < args.count { pet.logPath = args[i + 1] }
         pet.onMenu = { [weak self] e in self?.showMenu(e) }
+        pet.selfTest = args.contains("--selftest")
+        pet.onAutoMenu = { [weak self] in
+            // not from inside the frame timer, or the animation would stand still while the menu is open
+            DispatchQueue.main.async { self?.autoMenu() }
+        }
         pet.start()
         panel.orderFrontRegardless()
         if args.contains("--featdemo") {
@@ -1737,6 +1859,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let m = buildMenu()
         m.delegate = self
         NSMenu.popUpContextMenu(m, with: e, for: pet)
+    }
+
+    // Self-test: opens the right-click menu next to him and closes it again after a moment.
+    func autoMenu() {
+        let m = buildMenu()
+        m.delegate = self
+        let t = Timer(timeInterval: 3, repeats: false) { _ in m.cancelTracking() }
+        RunLoop.main.add(t, forMode: .common)
+        m.popUp(positioning: nil, at: NSPoint(x: pet.W / 2 + 9 * pet.S, y: pet.H - 14 * pet.S), in: pet)
+        pet.log("selftest: the menu was open and closed again")
     }
 
     func menuWillOpen(_ menu: NSMenu) { pet.menuOpen = true }
